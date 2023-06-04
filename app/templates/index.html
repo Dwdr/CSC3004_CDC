@@ -7,6 +7,8 @@
       <video id="videoElement" width="50%" autoplay></video>
     </div>
 
+    <div id="movementStatus"></div>
+
     <script>
       var video = document.getElementById("videoElement");
 
@@ -27,7 +29,11 @@
                 canvas.width,
                 canvas.height
               );
-              updateMovementStatus(imageData);
+
+              // Convert image data to base64 string
+              var base64Image = canvas.toDataURL("image/png");
+              sendImageToBackend(base64Image);
+
               requestAnimationFrame(captureFrames);
             }
 
@@ -35,6 +41,35 @@
           })
           .catch(function (error) {
             console.log("Error accessing camera: " + error);
+          });
+      }
+
+      function sendImageToBackend(imageData) {
+        // Send the image data to the backend using AJAX or fetch API
+        // Replace the URL with the appropriate endpoint in your backend
+        var endpointURL = "http://127.0.0.1:8000/process-image";
+        fetch(endpointURL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: imageData }),
+        })
+          .then(function (response) {
+            // Handle the response from the backend
+            return response.json();
+          })
+          .then(function (data) {
+            // Update the HTML content based on the response
+            var movementStatus = document.getElementById("movementStatus");
+            if (data.has_movement) {
+              movementStatus.textContent = "Movement detected!";
+            } else {
+              movementStatus.textContent = "No movement detected.";
+            }
+          })
+          .catch(function (error) {
+            console.log("Error sending image to backend:", error);
           });
       }
     </script>
