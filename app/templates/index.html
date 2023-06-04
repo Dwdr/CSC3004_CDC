@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1>Live streaming</h1>
+
+    <div>
+      <video id="videoElement" width="50%" autoplay></video>
+    </div>
+
+    <script>
+      var video = document.getElementById("videoElement");
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then(function (stream) {
+            video.srcObject = stream;
+
+            var canvas = document.createElement("canvas");
+            var context = canvas.getContext("2d");
+
+            function captureFrames() {
+              context.drawImage(video, 0, 0, canvas.width, canvas.height);
+              var imageData = context.getImageData(
+                0,
+                0,
+                canvas.width,
+                canvas.height
+              );
+              updateMovementStatus(imageData);
+              requestAnimationFrame(captureFrames);
+            }
+
+            requestAnimationFrame(captureFrames);
+          })
+          .catch(function (error) {
+            console.log("Error accessing camera: " + error);
+          });
+      }
+    </script>
+  </body>
+</html>
