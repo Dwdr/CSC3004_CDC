@@ -5,16 +5,21 @@
 
     <div>
       <video id="videoElement" width="50%" autoplay></video>
+      <div id="recordedVideoContainer"></div>
     </div>
 
     <div id="movementStatus"></div>
 
-    <button onclick="startRecording()">Record 5 seconds</button>
+    <button onclick="startRecording()">Record 5 second of Video</button>
 
     <script>
       var video = document.getElementById("videoElement");
+      var recordedVideoContainer = document.getElementById(
+        "recordedVideoContainer"
+      );
       var recording = false;
       var recordedChunks = [];
+      var mediaRecorder;
       var constraints = { audio: true, video: true };
 
       function requestCameraAccess() {
@@ -22,11 +27,11 @@
           navigator.mediaDevices
             .getUserMedia(constraints)
             .then(function (mediaStream) {
-              var video = document.querySelector("video");
               video.srcObject = mediaStream;
               video.onloadedmetadata = function (e) {
                 video.play();
               };
+              enableRecording(); // Start capturing frames once the camera access is granted
             })
             .catch(function (err) {
               console.log(err.name + ": " + err.message);
@@ -71,16 +76,55 @@
       function startRecording() {
         if (!recording) {
           recordedChunks = [];
-          setTimeout(stopRecording, 5000); // Stop recording after 5 seconds
+          mediaRecorder = new MediaRecorder(video.srcObject, {
+            mimeType: "video/webm; codecs=vp9",
+          });
+          mediaRecorder.ondataavailable = handleDataAvailable;
+          mediaRecorder.start();
+          setTimeout(stopRecording, 5000);
         }
         recording = true;
       }
 
+      function handleDataAvailable(event) {
+        if (event.data.size > 0) {
+          recordedChunks.push(event.data);
+        }
+      }
+
       function stopRecording() {
-        recording = false;
+        if (recording) {
+          recording = false;
+          mediaRecorder.stop();
+
+          // Wait for the 'stop' event to ensure all data has been processed
+          mediaRecorder.addEventListener("stop", function () {
+            sendVideoToBackend();
+          });
+        }
+      }
+
+      function sendVideoToBackend() {
         var blob = new Blob(recordedChunks, { type: "video/webm" });
-        var videoURL = URL.createObjectURL(blob);
-        downloadVideo(videoURL);
+        var url = URL.createObjectURL(blob);
+        var formData = new FormData();
+        formData.append("video", blob, "recorded_video.webm");
+
+        var endpointURL = "http://127.0.0.1:8000/save-video";
+
+        fetch(endpointURL, {
+          method: "POST",
+          body: formData,
+        })
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (data) {
+            console.log("Video saved:", data);
+          })
+          .catch(function (error) {
+            console.log("Error saving video:", error);
+          });
       }
 
       function sendImageToBackend(imageData) {
@@ -110,16 +154,6 @@
           .catch(function (error) {
             console.log("Error sending image to backend:", error);
           });
-      }
-
-      function downloadVideo(url) {
-        var a = document.createElement("a");
-        a.href = url;
-        a.download = "recorded_video.webm";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
       }
 
       // Request camera access when the page loads
