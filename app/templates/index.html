@@ -9,39 +9,78 @@
 
     <div id="movementStatus"></div>
 
+    <button onclick="startRecording()">Record 5 seconds</button>
+
     <script>
       var video = document.getElementById("videoElement");
+      var recording = false;
+      var recordedChunks = [];
+      var constraints = { audio: true, video: true };
 
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices
-          .getUserMedia({ video: true })
-          .then(function (stream) {
-            video.srcObject = stream;
+      function requestCameraAccess() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices
+            .getUserMedia(constraints)
+            .then(function (mediaStream) {
+              var video = document.querySelector("video");
+              video.srcObject = mediaStream;
+              video.onloadedmetadata = function (e) {
+                video.play();
+              };
+            })
+            .catch(function (err) {
+              console.log(err.name + ": " + err.message);
+            });
+        } else {
+          console.log("getUserMedia is not supported in this browser.");
+          displayBrowserNotSupported();
+        }
+      }
 
-            var canvas = document.createElement("canvas");
-            var context = canvas.getContext("2d");
+      function displayBrowserNotSupported() {
+        var movementStatus = document.getElementById("movementStatus");
+        movementStatus.textContent =
+          "Camera access is not supported in this browser. Please switch to a supported browser to use this feature.";
+      }
 
-            function captureFrames() {
-              context.drawImage(video, 0, 0, canvas.width, canvas.height);
-              var imageData = context.getImageData(
-                0,
-                0,
-                canvas.width,
-                canvas.height
-              );
+      function enableRecording() {
+        var canvas = document.createElement("canvas");
+        var context = canvas.getContext("2d");
 
-              // Convert image data to base64 string
-              var base64Image = canvas.toDataURL("image/png");
-              sendImageToBackend(base64Image);
+        function captureFrames() {
+          if (recording) {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            var imageData = context.getImageData(
+              0,
+              0,
+              canvas.width,
+              canvas.height
+            );
 
-              requestAnimationFrame(captureFrames);
-            }
+            // Convert image data to base64 string
+            var base64Image = canvas.toDataURL("image/png");
+            sendImageToBackend(base64Image);
+          }
 
-            requestAnimationFrame(captureFrames);
-          })
-          .catch(function (error) {
-            console.log("Error accessing camera: " + error);
-          });
+          requestAnimationFrame(captureFrames);
+        }
+
+        requestAnimationFrame(captureFrames);
+      }
+
+      function startRecording() {
+        if (!recording) {
+          recordedChunks = [];
+          setTimeout(stopRecording, 5000); // Stop recording after 5 seconds
+        }
+        recording = true;
+      }
+
+      function stopRecording() {
+        recording = false;
+        var blob = new Blob(recordedChunks, { type: "video/webm" });
+        var videoURL = URL.createObjectURL(blob);
+        downloadVideo(videoURL);
       }
 
       function sendImageToBackend(imageData) {
@@ -72,6 +111,19 @@
             console.log("Error sending image to backend:", error);
           });
       }
+
+      function downloadVideo(url) {
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "recorded_video.webm";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      // Request camera access when the page loads
+      requestCameraAccess();
     </script>
   </body>
 </html>
