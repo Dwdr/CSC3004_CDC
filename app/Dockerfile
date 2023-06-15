@@ -4,6 +4,9 @@ FROM --platform=$BUILDPLATFORM python AS builder
 WORKDIR /app
 
 RUN apt update; apt install -y libgl1
+RUN apt-get -y update
+RUN apt-get -y upgrade
+RUN apt-get install -y ffmpeg
 
 COPY requirements.txt /app
 RUN --mount=type=cache,target=/root/.cache/pip \
