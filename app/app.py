@@ -15,6 +15,7 @@ from flask import (
     send_file,
 )
 from moviepy.editor import AudioFileClip, VideoFileClip
+import boto3
 
 app = Flask(__name__)
 
@@ -51,24 +52,24 @@ def process_image():
     return jsonify({"has_movement": has_movement, "has_crime": has_crime})
 
 
-# TODO: Save video to cloud storage
 @app.route("/save-video", methods=["POST"])
 def save_video():
     video = request.files["video"]
 
+    # Generate a unique filename
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"recorded_video_{timestamp}.webm"
 
-    directory = "resources"
-    os.makedirs(directory, exist_ok=True)
+    # Specify the S3 bucket name and target path
+    s3 = boto3.client("s3")
+    bucket_name = "cdcvideobucket"
+    key = f"videos/{filename}"
 
-    video_path = os.path.join(directory, filename)
-    video.save(video_path)
+    # Upload the video file to Amazon S3
+    s3.upload_fileobj(video, bucket_name, key)
+    s3_url = f"https://{bucket_name}.s3.amazonaws.com/{filename}"
 
-    response = make_response(send_file(video_path))
-    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
-
-    return response
+    return jsonify({"s3_url": s3_url})
 
 
 if __name__ == "__main__":
