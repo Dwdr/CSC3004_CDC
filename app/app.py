@@ -16,9 +16,10 @@ from flask import (
 )
 from moviepy.editor import AudioFileClip, VideoFileClip
 import boto3
+from dotenv import load_dotenv
 
 app = Flask(__name__)
-
+load_dotenv() # Load environment variables
 
 def detect_movement(image_data):
     nparr = np.frombuffer(base64.b64decode(image_data.split(",")[1]), np.uint8)
@@ -60,8 +61,18 @@ def save_video():
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"recorded_video_{timestamp}.webm"
 
+    # Configure AWS access keys and region
+    access_key = os.getenv("AWS_ACCESS_KEY_ID")
+    secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+    region_name = "ap-southeast-1"
+
     # Specify the S3 bucket name and target path
-    s3 = boto3.client("s3")
+    s3 = boto3.client(
+        "s3", 
+        aws_access_key_id=access_key, 
+        aws_secret_access_key=secret_key, 
+        region_name=region_name
+    )
     bucket_name = "cdcvideobucket"
     key = f"videos/{filename}"
 
