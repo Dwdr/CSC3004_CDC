@@ -1,7 +1,9 @@
 import base64
 import datetime
+import json
 import os
 import subprocess
+import time
 
 import cv2
 import numpy as np
@@ -79,6 +81,36 @@ def save_video():
     key = f"videos/{filename}"
     s3.upload_fileobj(video, bucket_name, key)
     s3_url = f"https://{bucket_name}.s3.amazonaws.com/{filename}"
+
+    # Using string slicing to replace file extension
+    new_extension = ".json"
+    position = filename.rfind(".")
+    new_filename = filename[:position] + new_extension
+
+    result_bucket = 'cdcanalysisbucket'
+    result_key = f"analysis/{new_filename}"
+    print(result_key)
+
+    exec = False
+    start_time = time.time()
+    while exec is False:
+        try:
+            if time.time() - start_time >= 90:
+                break
+            s3.get_object(
+                Bucket=result_bucket,
+                Key=result_key,
+            )
+            response = s3.get_object(Bucket=result_bucket, Key=result_key)
+
+            data = response['Body'].read().decode('utf-8')
+            print(data)
+            result = json.loads(data)
+            print(result["bucket_name"])
+            exec = True
+        except s3.exceptions.NoSuchKey:
+            time.sleep(5)
+            exec = False
 
     return jsonify({"s3_url": s3_url})
 
