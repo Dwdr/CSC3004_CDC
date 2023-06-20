@@ -35,7 +35,9 @@ s3 = boto3.client(
     aws_secret_access_key=secret_key, 
     region_name=region_name
 )
-bucket_name = "cdcvideobucket"
+video_bucket_name = "cdcvideobucket"
+analysis_bucket_name = "cdcanalysisbucket"
+
 
 def detect_movement(image_data):
     nparr = np.frombuffer(base64.b64decode(image_data.split(",")[1]), np.uint8)
@@ -79,40 +81,52 @@ def save_video():
 
     # Upload the video file to Amazon S3 with the target path
     key = f"videos/{filename}"
-    s3.upload_fileobj(video, bucket_name, key)
-    s3_url = f"https://{bucket_name}.s3.amazonaws.com/{filename}"
-
-    # Using string slicing to replace file extension
-    new_extension = ".json"
-    position = filename.rfind(".")
-    new_filename = filename[:position] + new_extension
-
-    result_bucket = 'cdcanalysisbucket'
-    result_key = f"analysis/{new_filename}"
-    print(result_key)
-
-    exec = False
-    start_time = time.time()
-    while exec is False:
-        try:
-            if time.time() - start_time >= 90:
-                break
-            s3.get_object(
-                Bucket=result_bucket,
-                Key=result_key,
-            )
-            response = s3.get_object(Bucket=result_bucket, Key=result_key)
-
-            data = response['Body'].read().decode('utf-8')
-            print(data)
-            result = json.loads(data)
-            print(result["bucket_name"])
-            exec = True
-        except s3.exceptions.NoSuchKey:
-            time.sleep(5)
-            exec = False
+    s3.upload_fileobj(video, video_bucket_name, key)
+    s3_url = f"https://{video_bucket_name}.s3.amazonaws.com/{filename}"
 
     return jsonify({"s3_url": s3_url})
+
+
+def get_latest_analysis_key():
+    response = s3.list_objects_v2(
+        Bucket=analysis_bucket_name,
+        Prefix="analysis/"
+    )
+    objects = response.get("Contents", [])
+    
+    if objects:
+        # Retrieve the latest results based on timestamp
+        latest_object = max(objects, key=lambda obj: obj["LastModified"])
+        latest_analysis_key = latest_object["Key"]
+        return latest_analysis_key
+    else:
+        return None
+        
+
+@app.route("/get-analysis", methods=["POST"])
+def get_analysis():
+
+    analysis_key = get_latest_analysis_key()
+    if not analysis_key:
+        return jsonify({"error": "No analysis data found"})
+    
+    timeout = 30 # Timeout duration in seconds
+    start_time = time.time()
+
+    # Retrieve the analysis results
+    while time.time() - start_time < timeout:
+        try:
+            response = s3.get_object(
+                Bucket=analysis_bucket_name, 
+                Key=analysis_key
+            )
+            analysis_data = response["Body"].read().decode("utf-8")
+            analysis_result = json.loads(analysis_data)
+            return jsonify(analysis_result["object_key"])
+        except:
+            pass
+    
+    return jsonify({"error": "Failed to retrieve analysis data"})
 
 
 if __name__ == "__main__":
