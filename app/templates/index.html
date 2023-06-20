@@ -9,14 +9,15 @@
     </div>
 
     <div id="movementStatus"></div>
+    <div id="violenceStatus"></div>
 
-    <button onclick="startRecording()">Record 5 second of Video</button>
+    <button onclick="startRecording()">Record 5 seconds of Video</button>
 
     <script>
       var video = document.getElementById("videoElement");
-      var recordedVideoContainer = document.getElementById(
-        "recordedVideoContainer"
-      );
+      var recordedVideoContainer = document.getElementById("recordedVideoContainer");
+      var movementStatus = document.getElementById("movementStatus");
+      var violenceStatus = document.getElementById("violenceStatus");
       var recording = false;
       var recordedChunks = [];
       var mediaRecorder;
@@ -127,9 +128,12 @@
           });
       }
 
+      function displayDetectionStatus(movementDetected, violenceDetected) {
+        movementStatus.textContent = movementDetected ? "Movement detected!" : "No movement detected.";
+        violenceStatus.textContent = violenceDetected ? "Violence detected!" : "";
+      }
+
       function sendImageToBackend(imageData) {
-        // Send the image data to the backend using AJAX or fetch API
-        // Replace the URL with the appropriate endpoint in your backend
         var endpointURL = "http://127.0.0.1:8000/process-image";
         fetch(endpointURL, {
           method: "POST",
@@ -139,24 +143,19 @@
           body: JSON.stringify({ image: imageData }),
         })
           .then(function (response) {
-            // Handle the response from the backend
             return response.json();
           })
           .then(function (data) {
-            // Update the HTML content based on the response
-            var movementStatus = document.getElementById("movementStatus");
-            if (data.has_movement) {
-              movementStatus.textContent = "Movement detected!";
-            } else {
-              movementStatus.textContent = "No movement detected.";
-            }
+            var movementDetected = data.has_movement;
+            var violenceDetected = data.has_crime;
+
+            displayDetectionStatus(movementDetected, violenceDetected);
           })
           .catch(function (error) {
             console.log("Error sending image to backend:", error);
           });
       }
 
-      // Request camera access when the page loads
       requestCameraAccess();
     </script>
   </body>

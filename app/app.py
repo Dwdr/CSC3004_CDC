@@ -3,6 +3,9 @@ import datetime
 import os
 import subprocess
 
+from keras.models import load_model
+from keras.optimizers import SGD
+
 import cv2
 import numpy as np
 from flask import (
@@ -15,11 +18,9 @@ from flask import (
     send_file,
 )
 from moviepy.editor import AudioFileClip, VideoFileClip
-import boto3
-from dotenv import load_dotenv
 
 app = Flask(__name__)
-load_dotenv() # Load environment variables
+
 
 def detect_movement(image_data):
     nparr = np.frombuffer(base64.b64decode(image_data.split(",")[1]), np.uint8)
@@ -35,8 +36,24 @@ def detect_movement(image_data):
 
 
 def detect_crime(image_data):
-    # TODO: Implement crime detection
-    return True
+    # Load the pre-trained violence detection model
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+
+    model = load_model('modelnew.h5')
+
+    model.compile(optimizer=sgd,
+                loss='categorical_crossentropy',
+                metrics=['accuracy'])
+
+    # Convert the image data to a NumPy array
+    image = np.frombuffer(base64.b64decode(image_data.split(",")[1]), np.uint8)
+    image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+
+    # Predict whether the image contains violence
+    prediction = model.predict(image)
+
+    # Return True if the image contains violence, False otherwise
+    return prediction[0] > 0.5
 
 
 @app.route("/")
@@ -53,34 +70,24 @@ def process_image():
     return jsonify({"has_movement": has_movement, "has_crime": has_crime})
 
 
+# TODO: Save video to cloud storage
 @app.route("/save-video", methods=["POST"])
 def save_video():
     video = request.files["video"]
 
-    # Generate a unique filename
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"recorded_video_{timestamp}.webm"
 
-    # Configure AWS access keys and region
-    access_key = os.getenv("AWS_ACCESS_KEY_ID")
-    secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-    region_name = "ap-southeast-1"
+    directory = "resources"
+    os.makedirs(directory, exist_ok=True)
 
-    # Specify the S3 bucket name and target path
-    s3 = boto3.client(
-        "s3", 
-        aws_access_key_id=access_key, 
-        aws_secret_access_key=secret_key, 
-        region_name=region_name
-    )
-    bucket_name = "cdcvideobucket"
-    key = f"videos/{filename}"
+    video_path = os.path.join(directory, filename)
+    video.save(video_path)
 
-    # Upload the video file to Amazon S3
-    s3.upload_fileobj(video, bucket_name, key)
-    s3_url = f"https://{bucket_name}.s3.amazonaws.com/{filename}"
+    response = make_response(send_file(video_path))
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
 
-    return jsonify({"s3_url": s3_url})
+    return response
 
 
 if __name__ == "__main__":
