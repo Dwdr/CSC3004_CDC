@@ -21,6 +21,20 @@ from dotenv import load_dotenv
 app = Flask(__name__)
 load_dotenv() # Load environment variables
 
+# Configure AWS access keys and region
+access_key = os.getenv("AWS_ACCESS_KEY_ID")
+secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+region_name = "ap-southeast-1"
+
+# Specify the S3 bucket name
+s3 = boto3.client(
+    "s3", 
+    aws_access_key_id=access_key, 
+    aws_secret_access_key=secret_key, 
+    region_name=region_name
+)
+bucket_name = "cdcvideobucket"
+
 def detect_movement(image_data):
     nparr = np.frombuffer(base64.b64decode(image_data.split(",")[1]), np.uint8)
     image = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
@@ -61,22 +75,8 @@ def save_video():
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"recorded_video_{timestamp}.webm"
 
-    # Configure AWS access keys and region
-    access_key = os.getenv("AWS_ACCESS_KEY_ID")
-    secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-    region_name = "ap-southeast-1"
-
-    # Specify the S3 bucket name and target path
-    s3 = boto3.client(
-        "s3", 
-        aws_access_key_id=access_key, 
-        aws_secret_access_key=secret_key, 
-        region_name=region_name
-    )
-    bucket_name = "cdcvideobucket"
+    # Upload the video file to Amazon S3 with the target path
     key = f"videos/{filename}"
-
-    # Upload the video file to Amazon S3
     s3.upload_fileobj(video, bucket_name, key)
     s3_url = f"https://{bucket_name}.s3.amazonaws.com/{filename}"
 
