@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.4
 FROM --platform=$BUILDPLATFORM python AS builder
 
-WORKDIR /app
+WORKDIR /client
 
 RUN apt update; apt install -y libgl1
 RUN apt-get -y update
@@ -12,7 +12,7 @@ COPY requirements.txt /app
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install -r requirements.txt
 
-COPY . /app
+COPY . /client
 
 ENTRYPOINT ["python3"]
 CMD ["app.py"]

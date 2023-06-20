@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>File Names</title>
+    <style>
+      table {
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border: 1px solid black;
+        padding: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>File Names</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>File Name</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="file-names-body"></tbody>
+    </table>
+
+    <script>
+      // Make a GET request to the Flask route "/file-names" to retrieve the file names
+      fetch("http://127.0.0.1:8001/file-names")
+        .then((response) => response.json())
+        .then((data) => {
+          const fileNames = data.fileNames;
+
+          // Get the table body element
+          const tableBody = document.getElementById("file-names-body");
+
+          // Loop through the file names and create table rows with two columns
+          fileNames.forEach((fileName) => {
+            const row = document.createElement("tr");
+
+            const fileNameCell = document.createElement("td");
+            fileNameCell.textContent = fileName;
+            row.appendChild(fileNameCell);
+
+            const statusCell = document.createElement("td");
+            // You can modify this logic to determine the status based on your requirements
+            statusCell.textContent = "Unprocessed";
+            row.appendChild(statusCell);
+
+            tableBody.appendChild(row);
+          });
+        })
+        .catch((error) => console.error(error));
+    </script>
+  </body>
+</html>

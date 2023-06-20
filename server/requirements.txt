@@ -1,0 +1,4 @@
+flask
+keras
+boto3
+python-dotenv

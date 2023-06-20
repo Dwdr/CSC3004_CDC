@@ -15,7 +15,9 @@
 
     <script>
       var video = document.getElementById("videoElement");
-      var recordedVideoContainer = document.getElementById("recordedVideoContainer");
+      var recordedVideoContainer = document.getElementById(
+        "recordedVideoContainer"
+      );
       var movementStatus = document.getElementById("movementStatus");
       var violenceStatus = document.getElementById("violenceStatus");
       var recording = false;
@@ -125,34 +127,6 @@
           })
           .catch(function (error) {
             console.log("Error saving video:", error);
-          });
-      }
-
-      function displayDetectionStatus(movementDetected, violenceDetected) {
-        movementStatus.textContent = movementDetected ? "Movement detected!" : "No movement detected.";
-        violenceStatus.textContent = violenceDetected ? "Violence detected!" : "";
-      }
-
-      function sendImageToBackend(imageData) {
-        var endpointURL = "http://127.0.0.1:8000/process-image";
-        fetch(endpointURL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ image: imageData }),
-        })
-          .then(function (response) {
-            return response.json();
-          })
-          .then(function (data) {
-            var movementDetected = data.has_movement;
-            var violenceDetected = data.has_crime;
-
-            displayDetectionStatus(movementDetected, violenceDetected);
-          })
-          .catch(function (error) {
-            console.log("Error sending image to backend:", error);
           });
       }
 
