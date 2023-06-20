@@ -5,20 +5,20 @@
 
     <div>
       <video id="videoElement" width="50%" autoplay></video>
-      <div id="recordedVideoContainer"></div>
     </div>
-
-    <div id="movementStatus"></div>
-    <div id="violenceStatus"></div>
-
-    <button onclick="startRecording()">Record 5 seconds of Video</button>
+    
+    <div id="recordButtonSection">
+      <button onclick="startRecording()">Record 5 seconds of Video</button>
+    </div>
+    
+    <div id="violenceStatusSection">
+      <h2>Violence Status:</h2>
+      <div id="violenceStatus"></div>
+    </div>
+    
 
     <script>
       var video = document.getElementById("videoElement");
-      var recordedVideoContainer = document.getElementById(
-        "recordedVideoContainer"
-      );
-      var movementStatus = document.getElementById("movementStatus");
       var violenceStatus = document.getElementById("violenceStatus");
       var recording = false;
       var recordedChunks = [];
@@ -46,8 +46,8 @@
       }
 
       function displayBrowserNotSupported() {
-        var movementStatus = document.getElementById("movementStatus");
-        movementStatus.textContent =
+        var violenceStatus = document.getElementById("violenceStatus");
+        violenceStatus.textContent =
           "Camera access is not supported in this browser. Please switch to a supported browser to use this feature.";
       }
 
@@ -108,27 +108,62 @@
       }
 
       function sendVideoToBackend() {
-        var blob = new Blob(recordedChunks, { type: "video/webm" });
-        var url = URL.createObjectURL(blob);
-        var formData = new FormData();
-        formData.append("video", blob, "recorded_video.webm");
+      var formData = new FormData();
+      recordedChunks.forEach(function (chunk) {
+        formData.append("video", chunk, "video.webm");
+      });
 
-        var endpointURL = "http://127.0.0.1:8000/save-video";
+      fetch("http://127.0.0.1:8001/detect-frame", {
+        method: "POST",
+        body: formData,
+      })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          // Update the HTML content based on the response
+          var violenceStatus = document.getElementById("violenceStatus");
+          if (data.has_crime) {
+            violenceStatus.textContent = "Violence detected!";
+          } else {
+            violenceStatus.textContent = "No violence detected.";
+          }
+        })
+        .catch(function (error) {
+          console.log("Error during crime detection:", error);
+        });
+    }
 
+
+    function sendImageToBackend(imageData) {
+        // Send the image data to the backend using AJAX or fetch API
+        // Replace the URL with the appropriate endpoint in your backend
+        var endpointURL = "http://127.0.0.1:8001/process-image";
         fetch(endpointURL, {
           method: "POST",
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: imageData }),
         })
           .then(function (response) {
+            // Handle the response from the backend
             return response.json();
           })
           .then(function (data) {
-            console.log("Video saved:", data);
+            // Update the HTML content based on the response
+            var violenceStatus = document.getElementById("violenceStatus");
+            if (data.has_crime) {
+              violenceStatus.textContent = "Violence detected!";
+            } else {
+              violenceStatus.textContent = "No violence detected.";
+            }
           })
           .catch(function (error) {
-            console.log("Error saving video:", error);
+            console.log("Error sending image to backend:", error);
           });
       }
+            
 
       requestCameraAccess();
     </script>
