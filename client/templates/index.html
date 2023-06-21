@@ -6,24 +6,39 @@
     <div>
       <video id="videoElement" width="50%" autoplay></video>
     </div>
-    
-    <div id="recordButtonSection">
-      <button onclick="startRecording()">Record 5 seconds of Video</button>
-    </div>
-    
+
     <div id="violenceStatusSection">
+      <h2>Status Connection to backend server:</h2>
+      <div id="serverStatus"></div>
+
       <h2>Violence Status:</h2>
       <div id="violenceStatus"></div>
     </div>
-    
+
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
 
     <script>
       var video = document.getElementById("videoElement");
       var violenceStatus = document.getElementById("violenceStatus");
-      var recording = false;
-      var recordedChunks = [];
-      var mediaRecorder;
+      var serverStatus = document.getElementById("serverStatus");
+
+      var socket = io("http://127.0.0.1:8001");
+
+      violenceStatus.textContent = "Detecting...";
+      serverStatus.textContent = "Connecting to the server...";
+
+      var uid = generateUID();
       var constraints = { audio: true, video: true };
+
+      function generateUID() {
+        var chars =
+          "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        var uid = "";
+        for (var i = 0; i < 16; i++) {
+          uid += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return uid;
+      }
 
       function requestCameraAccess() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -51,154 +66,75 @@
           "Camera access is not supported in this browser. Please switch to a supported browser to use this feature.";
       }
 
-      function enableRecording() {
-        var canvas = document.createElement("canvas");
-        var context = canvas.getContext("2d");
-
-        function captureFrames() {
-          if (recording) {
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            var imageData = context.getImageData(
-              0,
-              0,
-              canvas.width,
-              canvas.height
-            );
-
-            // Convert image data to base64 string
-            var base64Image = canvas.toDataURL("image/png");
-            sendImageToBackend(base64Image);
+      socket.on("detection_result", function (data) {
+        // Handle the "detection_result" event here
+        if ("status" in data) {
+          // Handle "status" event
+          var status = data.status;
+          if (status === "1") {
+            console.log("Server status: Connected");
+            serverStatus.textContent = "Connected";
+          } else if (status === "0") {
+            console.log("Server status: Error");
+            serverStatus.textContent = "Error";
+          } else {
+            console.log("Server status: Unknown");
+            serverStatus.textContent = "Unknown";
           }
-
-          requestAnimationFrame(captureFrames);
+        } else if ("has_crime" in data) {
+          var hasCrime = data.has_crime;
+          if (hasCrime === 1) {
+            console.log("Violence detected!");
+            violenceStatus.textContent = "Violence detected!";
+          } else if (hasCrime === 0) {
+            console.log("No violence detected.");
+            violenceStatus.textContent = "No violence detected.";
+          } else {
+            console.log("Error: Unable to determine violence status.");
+            violenceStatus.textContent =
+              "Error: Unable to determine violence status.";
+          }
         }
-
-        requestAnimationFrame(captureFrames);
-      }
-
-      function startRecording() {
-        if (!recording) {
-          recordedChunks = [];
-          mediaRecorder = new MediaRecorder(video.srcObject, {
-            mimeType: "video/webm; codecs=vp9",
-          });
-          mediaRecorder.ondataavailable = handleDataAvailable;
-          mediaRecorder.start();
-          setTimeout(stopRecording, 5000);
-        }
-        recording = true;
-      }
-
-      function handleDataAvailable(event) {
-        if (event.data.size > 0) {
-          recordedChunks.push(event.data);
-        }
-      }
-
-      function stopRecording() {
-        if (recording) {
-          recording = false;
-          mediaRecorder.stop();
-
-          // Wait for the 'stop' event to ensure all data has been processed
-          mediaRecorder.addEventListener("stop", function () {
-            sendVideoToBackend();
-          });
-        }
-      }
-
-    //   function sendVideoToBackend() {
-    //   var formData = new FormData();
-    //   recordedChunks.forEach(function (chunk) {
-    //     formData.append("video", chunk, "video.webm");
-    //   });
-
-    //   fetch("http://127.0.0.1:8001/detect-frame", {
-    //     method: "POST",
-    //     body: formData,
-    //   })
-    //     .then(function (response) {
-    //       return response.json();
-    //     })
-    //     .then(function (data) {
-    //       // Update the HTML content based on the response
-    //       var violenceStatus = document.getElementById("violenceStatus");
-    //       if (data.has_crime) {
-    //         violenceStatus.textContent = "Violence detected!";
-    //       } else {
-    //         violenceStatus.textContent = "No violence detected.";
-    //       }
-    //     })
-    //     .catch(function (error) {
-    //       console.log("Error during crime detection:", error);
-    //     });
-    // }
-
-
-    // function sendImageToBackend(imageData) {
-    //     // Send the image data to the backend using AJAX or fetch API
-    //     // Replace the URL with the appropriate endpoint in your backend
-    //     var endpointURL = "http://127.0.0.1:8001/detect-frame";
-    //     fetch(endpointURL, {
-    //       method: "POST",
-    //       headers: {
-    //         "Content-Type": "application/json",
-    //       },
-    //       body: JSON.stringify({ image: imageData }),
-    //     })
-    //       .then(function (response) {
-    //         // Handle the response from the backend
-    //         return response.json();
-    //       })
-    //       .then(function (data) {
-    //         // Update the HTML content based on the response
-    //         var violenceStatus = document.getElementById("violenceStatus");
-    //         if (data.has_crime) {
-    //           violenceStatus.textContent = "Violence detected!";
-    //         } else {
-    //           violenceStatus.textContent = "No violence detected.";
-    //         }
-    //       })
-    //       .catch(function (error) {
-    //         console.log("Error sending image to backend:", error);
-    //       });
-    //   }
-
-    function sendImageToBackend(imageData) {
-    // Send the image data to the backend using AJAX or fetch API
-    // Replace the URL with the appropriate endpoint in your backend
-    var endpointURL = "http://127.0.0.1:8001/detect-frame";
-    violenceStatus.textContent = "Detecting...";
-    fetch(endpointURL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ image: imageData }),
-    })
-      .then(function (response) {
-        // Handle the response from the backend
-        return response.json();
-      })
-      .then(function (data) {
-        // Update the HTML content based on the response
-        var violenceStatus = document.getElementById("violenceStatus");
-        var hasCrime = data.has_crime;
-
-        
-        if (hasCrime === 1) {
-          violenceStatus.textContent = "Violence detected!";
-        } else if (hasCrime === 0) {
-          violenceStatus.textContent = "No violence detected.";
-        } else {
-          violenceStatus.textContent = "Error: Unable to determine violence status.";
-        }
-      })
-      .catch(function (error) {
-        console.log("Error sending image to backend:", error);
       });
-  }
 
+      function enableRecording() {
+        setInterval(function () {
+          var canvas = document.createElement("canvas");
+          var context = canvas.getContext("2d");
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          var imageData = context.getImageData(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+          // Convert image data to base64 string
+          var base64Image = canvas.toDataURL("image/png");
+          sendImageToBackend(base64Image);
+          console.log("Sending image to backend server");
+        }, 10000); // Capture frames every 10 seconds
+      }
+
+      function sendImageToBackend(imageData) {
+        fetch("http://127.0.0.1:8001/detect-frame", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: imageData, uid: uid }),
+        })
+          .then((response) => {
+            if (response.ok) {
+              console.log("Image sent to backend server.");
+            } else {
+              console.error("Error sending image to backend server.");
+            }
+          })
+          .catch((error) => {
+            console.error("Error sending image to backend server:", error);
+          });
+      }
 
       requestCameraAccess();
     </script>

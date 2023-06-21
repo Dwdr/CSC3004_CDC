@@ -25,9 +25,11 @@ from moviepy.editor import AudioFileClip, VideoFileClip
 
 app = Flask(__name__)
 
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 # Save video to AWS S3
 @app.route("/save-video", methods=["POST"])
@@ -59,6 +61,7 @@ def save_video():
 
     # Perform additional processing with the S3 URL or return it as a response
     return jsonify({"s3_url": s3_url})
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
