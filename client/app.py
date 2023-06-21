@@ -25,21 +25,14 @@ from moviepy.editor import AudioFileClip, VideoFileClip
 
 app = Flask(__name__)
 
-load_dotenv()
-
-
 @app.route("/")
 def index():
     return render_template("index.html")
 
-
-# TODO: Save video to cloud storage
+# Save video to AWS S3
 @app.route("/save-video", methods=["POST"])
 def save_video():
     video = request.files["video"]
-
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"recorded_video_{timestamp}.webm"
 
     # Configure AWS access keys and region
     access_key = os.getenv("AWS_ACCESS_KEY_ID")
@@ -47,21 +40,25 @@ def save_video():
     region_name = "ap-southeast-1"
 
     # Specify the S3 bucket name and target path
+    bucket_name = "cdcvideobucket"
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"recorded_video_{timestamp}.webm"
+    key = f"videos/{filename}"
+
+    # Upload the video file to Amazon S3
     s3 = boto3.client(
         "s3",
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
         region_name=region_name,
     )
-    bucket_name = "cdcvideobucket"
-    key = f"videos/{filename}"
-
-    # Upload the video file to Amazon S3
     s3.upload_fileobj(video, bucket_name, key)
+
+    # Get the S3 URL for the uploaded file
     s3_url = f"https://{bucket_name}.s3.amazonaws.com/{filename}"
 
+    # Perform additional processing with the S3 URL or return it as a response
     return jsonify({"s3_url": s3_url})
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)

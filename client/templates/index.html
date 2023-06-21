@@ -107,63 +107,98 @@
         }
       }
 
-      function sendVideoToBackend() {
-      var formData = new FormData();
-      recordedChunks.forEach(function (chunk) {
-        formData.append("video", chunk, "video.webm");
-      });
+    //   function sendVideoToBackend() {
+    //   var formData = new FormData();
+    //   recordedChunks.forEach(function (chunk) {
+    //     formData.append("video", chunk, "video.webm");
+    //   });
 
-      fetch("http://127.0.0.1:8001/detect-frame", {
-        method: "POST",
-        body: formData,
-      })
-        .then(function (response) {
-          return response.json();
-        })
-        .then(function (data) {
-          // Update the HTML content based on the response
-          var violenceStatus = document.getElementById("violenceStatus");
-          if (data.has_crime) {
-            violenceStatus.textContent = "Violence detected!";
-          } else {
-            violenceStatus.textContent = "No violence detected.";
-          }
-        })
-        .catch(function (error) {
-          console.log("Error during crime detection:", error);
-        });
-    }
+    //   fetch("http://127.0.0.1:8001/detect-frame", {
+    //     method: "POST",
+    //     body: formData,
+    //   })
+    //     .then(function (response) {
+    //       return response.json();
+    //     })
+    //     .then(function (data) {
+    //       // Update the HTML content based on the response
+    //       var violenceStatus = document.getElementById("violenceStatus");
+    //       if (data.has_crime) {
+    //         violenceStatus.textContent = "Violence detected!";
+    //       } else {
+    //         violenceStatus.textContent = "No violence detected.";
+    //       }
+    //     })
+    //     .catch(function (error) {
+    //       console.log("Error during crime detection:", error);
+    //     });
+    // }
 
+
+    // function sendImageToBackend(imageData) {
+    //     // Send the image data to the backend using AJAX or fetch API
+    //     // Replace the URL with the appropriate endpoint in your backend
+    //     var endpointURL = "http://127.0.0.1:8001/detect-frame";
+    //     fetch(endpointURL, {
+    //       method: "POST",
+    //       headers: {
+    //         "Content-Type": "application/json",
+    //       },
+    //       body: JSON.stringify({ image: imageData }),
+    //     })
+    //       .then(function (response) {
+    //         // Handle the response from the backend
+    //         return response.json();
+    //       })
+    //       .then(function (data) {
+    //         // Update the HTML content based on the response
+    //         var violenceStatus = document.getElementById("violenceStatus");
+    //         if (data.has_crime) {
+    //           violenceStatus.textContent = "Violence detected!";
+    //         } else {
+    //           violenceStatus.textContent = "No violence detected.";
+    //         }
+    //       })
+    //       .catch(function (error) {
+    //         console.log("Error sending image to backend:", error);
+    //       });
+    //   }
 
     function sendImageToBackend(imageData) {
-        // Send the image data to the backend using AJAX or fetch API
-        // Replace the URL with the appropriate endpoint in your backend
-        var endpointURL = "http://127.0.0.1:8001/process-image";
-        fetch(endpointURL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ image: imageData }),
-        })
-          .then(function (response) {
-            // Handle the response from the backend
-            return response.json();
-          })
-          .then(function (data) {
-            // Update the HTML content based on the response
-            var violenceStatus = document.getElementById("violenceStatus");
-            if (data.has_crime) {
-              violenceStatus.textContent = "Violence detected!";
-            } else {
-              violenceStatus.textContent = "No violence detected.";
-            }
-          })
-          .catch(function (error) {
-            console.log("Error sending image to backend:", error);
-          });
-      }
-            
+    // Send the image data to the backend using AJAX or fetch API
+    // Replace the URL with the appropriate endpoint in your backend
+    var endpointURL = "http://127.0.0.1:8001/detect-frame";
+    violenceStatus.textContent = "Detecting...";
+    fetch(endpointURL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ image: imageData }),
+    })
+      .then(function (response) {
+        // Handle the response from the backend
+        return response.json();
+      })
+      .then(function (data) {
+        // Update the HTML content based on the response
+        var violenceStatus = document.getElementById("violenceStatus");
+        var hasCrime = data.has_crime;
+
+        
+        if (hasCrime === 1) {
+          violenceStatus.textContent = "Violence detected!";
+        } else if (hasCrime === 0) {
+          violenceStatus.textContent = "No violence detected.";
+        } else {
+          violenceStatus.textContent = "Error: Unable to determine violence status.";
+        }
+      })
+      .catch(function (error) {
+        console.log("Error sending image to backend:", error);
+      });
+  }
+
 
       requestCameraAccess();
     </script>
