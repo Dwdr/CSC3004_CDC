@@ -33,6 +33,7 @@
       <thead>
         <tr>
           <th>Client ID</th>
+          <th>Client Email</th>
           <th>Status</th>
         </tr>
       </thead>
@@ -93,8 +94,9 @@
             // Loop through the connected devices and update/create table rows with two columns
             connectedDevices.forEach((device) => {
               const clientID = device.client_id;
+              const clientEmail = device.client_email;
               const hasCrime = device.has_crime;
-              console.log(clientID, hasCrime);
+              console.log(clientID, clientEmail, hasCrime);
 
               // Check if a row with the same client ID already exists
               const existingRow = dashboardTableBody.querySelector(
@@ -115,8 +117,18 @@
                 row.setAttribute("data-client", clientID);
 
                 const clientIDCell = document.createElement("td");
+                clientIDCell.className = "client-id-cell";
                 clientIDCell.textContent = clientID;
                 row.appendChild(clientIDCell);
+
+                const clientEmailCell = document.createElement("td");
+                clientEmailCell.className = "client-email-cell";
+                if (clientEmail === undefined) {
+                  clientEmailCell.textContent = "Unknown";
+                } else {
+                  clientEmailCell.textContent = clientEmail;
+                }
+                row.appendChild(clientEmailCell);
 
                 const statusCell = document.createElement("td");
                 statusCell.className = "status-cell";

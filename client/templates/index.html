@@ -4,6 +4,18 @@
     <h1>Live streaming</h1>
 
     <div>
+      <h2>Notification System</h2>
+      <label for="emailInput" id="emailInputLabel">Email Address:</label>
+      <input type="email" id="emailInput" />
+      <button onclick="sendEmail()" id="emailButton">Send Email</button>
+      <p hidden="true" id="emailText"></p>
+      <button onclick="changeEmail()" id="changeEmailButton" hidden="true">
+        Change Email
+      </button>
+      <br />
+    </div>
+
+    <div>
       <video id="videoElement" width="50%" autoplay></video>
     </div>
 
@@ -21,13 +33,32 @@
       var video = document.getElementById("videoElement");
       var violenceStatus = document.getElementById("violenceStatus");
       var serverStatus = document.getElementById("serverStatus");
+      var emailInputLabel = document.getElementById("emailInputLabel");
+      var emailInput = document.getElementById("emailInput");
+      var emailButton = document.getElementById("emailButton");
+      var emailText = document.getElementById("emailText");
+      var changeEmailButton = document.getElementById("changeEmailButton");
 
       var socket = io("http://127.0.0.1:8001");
 
       violenceStatus.textContent = "Detecting...";
       serverStatus.textContent = "Connecting to the server...";
 
-      var uid = generateUID();
+      var uid = sessionStorage.getItem("uid") || generateUID();
+      var email = sessionStorage.getItem("email");
+
+      if (email) {
+        emailInput.value = email;
+        emailInput.hidden = true;
+        emailInputLabel.hidden = true;
+        emailButton.hidden = true;
+        emailText.hidden = false;
+        emailText.textContent = "Notifications will be sent to: " + email;
+        changeEmailButton.hidden = false;
+      }
+
+      sessionStorage.setItem("uid", uid);
+
       var constraints = { audio: true, video: true };
 
       function generateUID() {
@@ -49,7 +80,7 @@
               video.onloadedmetadata = function (e) {
                 video.play();
               };
-              enableRecording(); // Start capturing frames once the camera access is granted
+              enableRecording();
             })
             .catch(function (err) {
               console.log(err.name + ": " + err.message);
@@ -67,9 +98,7 @@
       }
 
       socket.on("detection_result", function (data) {
-        // Handle the "detection_result" event here
         if ("status" in data) {
-          // Handle "status" event
           var status = data.status;
           if (status === "1") {
             console.log("Server status: Connected");
@@ -109,11 +138,82 @@
             canvas.height
           );
 
-          // Convert image data to base64 string
           var base64Image = canvas.toDataURL("image/png");
           sendImageToBackend(base64Image);
           console.log("Sending image to backend server");
-        }, 10000); // Capture frames every 10 seconds
+        }, 10000);
+      }
+
+      function changeEmail() {
+        fetch("http://127.0.0.1:8001/remove-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            uid: uid,
+            email: email,
+          }),
+        })
+          .then((response) => {
+            if (response.ok) {
+              console.log("Email removed from backend server.");
+              sessionStorage.removeItem("email");
+              emailInput.hidden = false;
+              emailInputLabel.hidden = false;
+              emailButton.hidden = false;
+              emailText.hidden = true;
+              changeEmailButton.hidden = true;
+            } else {
+              console.error("Error removing email from backend server.");
+            }
+          })
+          .catch((error) => {
+            console.error("Error removing email from backend server:", error);
+          });
+      }
+
+      function sendEmail() {
+        var email = emailInput.value;
+        if (validateEmail(email)) {
+          sendEmailToBackend(email);
+        } else {
+          alert("Please enter a valid email address.");
+        }
+      }
+
+      function validateEmail(email) {
+        var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailPattern.test(email);
+      }
+
+      function sendEmailToBackend(email) {
+        var email = emailInput.value;
+        fetch("http://127.0.0.1:8001/add-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: email, uid: uid }),
+        })
+          .then((response) => {
+            if (response.ok) {
+              console.log("Email sent to backend server.");
+              sessionStorage.setItem("email", email);
+              emailInput.hidden = true;
+              emailInputLabel.hidden = true;
+              emailButton.hidden = true;
+              emailText.hidden = false;
+              emailText.textContent = "Notifications will be sent to: " + email;
+              changeEmailButton.hidden = false;
+            } else {
+              alert("Error sending email to backend server.");
+              console.error("Error sending email to backend server.");
+            }
+          })
+          .catch((error) => {
+            console.error("Error sending email to backend server:", error);
+          });
       }
 
       function sendImageToBackend(imageData) {
@@ -134,6 +234,21 @@
           .catch((error) => {
             console.error("Error sending image to backend server:", error);
           });
+      }
+
+      // Add the following event listener at the end of the JavaScript code
+      window.addEventListener("beforeunload", function () {
+        disconnect();
+      });
+
+      // Modify the disconnect() function as follows
+      function disconnect() {
+        socket.disconnect();
+        serverStatus.textContent = "Disconnected";
+        violenceStatus.textContent =
+          "Connection to backend server disconnected.";
+        changeEmailButton.hidden = true;
+        disconnectButton.hidden = true;
       }
 
       requestCameraAccess();
