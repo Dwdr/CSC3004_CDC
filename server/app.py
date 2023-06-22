@@ -8,9 +8,11 @@ from tensorflow.keras.optimizers import SGD
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from email.mime.text import MIMEText
+from dotenv import load_dotenv
 
 import base64
 import boto3
+import datetime
 import cv2
 import numpy as np
 import os
@@ -24,36 +26,60 @@ CORS(app)
 
 connected_devices = []
 
-"""This function is used to load the names of all the videos stored in the S3 bucket.
+load_dotenv() # Load environment variables
+
+# Configure AWS access keys and region
+access_key = os.getenv("AWS_ACCESS_KEY_ID")
+secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+region_name = "ap-southeast-1"
+
+# Specify the S3 bucket name and target path
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=access_key,
+    aws_secret_access_key=secret_key,
+    region_name=region_name,
+)
+video_bucket_name = "cdcvideobucket"
+video_bucket_prefix = "videos/"
+image_bucket_name = "cdcimagebucket"
+image_bucket_prefix = "images/"
+analysis_bucket_name = "cdcanalysisbucket"
+analysis_bucket_prefix = "analysis/"
+
+from_email = os.getenv("EMAIL_ADDRESS")
+password = os.getenv("EMAIL_PASSWORD")
+
+
+"""This function is used to load the names of all the images stored in the S3 bucket.
    It returns a list of file names."""
 
+def load_cloud_images(uid):
+   # TODO: Somehow get the client's UID here
+   # Construct the prefix to match the files
+   prefix = f"images_{uid}"
 
-def load_cloud_videos():
-    # Configure AWS access keys and region
-    access_key = os.getenv("AWS_ACCESS_KEY_ID")
-    secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-    region_name = "ap-southeast-1"
+   try:
+        # List objects in the 'cdcimagebucket' with the specified prefix
+        response = s3.list_objects_v2(
+            Bucket='cdcimagebucket', 
+            Prefix=prefix
+        )
 
-    # Specify the S3 bucket name and target path
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name=region_name,
-    )
-    bucket_name = "cdcvideobucket"
-    prefix = "videos/"
+        # Initialize an empty list to store the file names
+        file_names = []
 
-    # List all objects in the S3 bucket with the specified prefix
-    response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+        # Iterate over the objects and add the file names to the list
+        for obj in response.get('Contents', []):
+            key = obj['Key']
+            # Add the file name to the list
+            file_names.append(key)
 
-    if "Contents" in response:
-        # Extract the file names from the response
-        file_names = [
-            obj["Key"] for obj in response["Contents"] if obj["Key"].endswith(".webm")
-        ]
+        # Return the list of file names
         return file_names
-    else:
+   
+   except Exception as e:
+        print(f"Error loading images from S3: {e}")
         return []
 
 
@@ -62,8 +88,6 @@ def load_cloud_videos():
 
 
 def send_email(to_email):
-    from_email = os.getenv("EMAIL_ADDRESS")
-    password = os.getenv("EMAIL_PASSWORD")
 
     # Compose the email content
     subject = "Crime Detected"
@@ -91,10 +115,7 @@ def send_email(to_email):
 """This function is used to send a welcome email to a new user.
    It takes in the user's email address as a parameter."""
 
-
 def send_welcome_email(to_email):
-    from_email = os.getenv("EMAIL_ADDRESS")
-    password = os.getenv("EMAIL_PASSWORD")
 
     subject = "Welcome to the System"
     body = "Welcome to our system! Thank you for joining."
@@ -175,7 +196,7 @@ def index():
 
 @app.route("/file-names", methods=["GET"])
 def file_names():
-    return {"fileNames": load_cloud_videos()}
+    return {"fileNames": load_cloud_images()}
 
 
 # This function is called when a client connects to the server
@@ -185,7 +206,7 @@ def handle_connect():
     print("Client connected")
 
 
-# This function is called when a client connects to the server
+# This function is called when a client disconnects from the server
 @socketio.on("disconnect")
 def disconnect(client_uid):
     device_to_remove = None
@@ -198,7 +219,6 @@ def disconnect(client_uid):
     if device_to_remove:
         connected_devices.remove(device_to_remove)
         print(f"Client {client_uid} disconnected")
-
 
 """Handles the detection of crime in a video frame on a separate thread"""
 

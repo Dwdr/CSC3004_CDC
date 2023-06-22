@@ -139,6 +139,7 @@
           );
 
           var base64Image = canvas.toDataURL("image/png");
+          saveImageToS3(base64Image);
           sendImageToBackend(base64Image);
           console.log("Sending image to backend server");
         }, 10000);
@@ -234,6 +235,26 @@
           .catch((error) => {
             console.error("Error sending image to backend server:", error);
           });
+      }
+
+      function saveImageToS3(imageData) {
+        fetch("http://127.0.0.1:8000/save-image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: imageData, uid: uid }),
+        })
+        .then((response) => {
+          if (response.ok) {
+            console.log("Image sent to backend server");
+          } else {
+            console.error("Error sending image to backend server");
+          }
+        })
+        .catch((error) => {
+          console.error("Error sending image to backend server: ", error);
+        });
       }
 
       // Add the following event listener at the end of the JavaScript code
