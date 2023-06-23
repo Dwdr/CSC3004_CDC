@@ -1,4 +1,9 @@
-from flask import Flask, render_template, request, jsonify
+from flask import (
+    Flask, 
+    render_template, 
+    request, 
+    jsonify
+)
 
 # from keras.models import load_model
 # from keras.optimizers import SGD
@@ -23,10 +28,9 @@ import requests
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
+load_dotenv() # Load environment variables
 
 connected_devices = []
-
-load_dotenv() # Load environment variables
 
 # Configure AWS access keys and region
 access_key = os.getenv("AWS_ACCESS_KEY_ID")
@@ -62,18 +66,9 @@ def save_image(image_data, uid, movement_value):
     # Convert the base64 image data from string to bytes
     image_bytes = base64.b64decode(base64_image_data)
 
-    # # Specify the path and filename to save the image
-    # save_path = "C:\\Users\\jour2\\Downloads"
-
     # Generate a unique filename
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = f"image_{uid}_{timestamp}.png"
-
-    # # Save the image to the specified path
-    # with open(file_path, "wb") as file:
-    #     file.write(image_bytes)
-
-    # return "Image saved successfully"
 
     # Crime has been detected
     if movement_value == 1:
@@ -99,26 +94,31 @@ def save_image(image_data, uid, movement_value):
    It returns a list of file names."""
 
 def load_cloud_images():
-   # TODO: Somehow get the client's UID here
-   # Construct the prefix to match the files
-   prefix = f"images"
-
    try:
-        # List objects in the 'cdcimagebucket' with the specified prefix
-        response = s3.list_objects_v2(
-            Bucket='cdcimagebucket', 
-            Prefix=prefix
-        )
-
         # Initialize an empty list to store the file names
         file_names = []
 
+        # List objects in the 'cdcimagebucket' with the specified prefix
+        crime_response = s3.list_objects_v2(
+            Bucket=image_bucket_name,
+            Prefix=image_bucket_prefix + "crime/"
+        )
+
         # Iterate over the objects and add the file names to the list
-        for obj in response.get('Contents', []):
+        for obj in crime_response.get('Contents', []):
             key = obj['Key']
             # Add the file name to the list
             file_names.append(key)
 
+        no_crime_response = s3.list_objects_v2(
+            Bucket=image_bucket_name,
+            Prefix=image_bucket_prefix + "no_crime/"
+        )
+
+        for obj in no_crime_response.get('Contents', []):
+            key = obj['Key']
+            file_names.append(key)
+        
         # Return the list of file names
         return file_names
    

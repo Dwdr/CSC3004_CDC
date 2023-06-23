@@ -134,7 +134,6 @@
 
           var base64Image = canvas.toDataURL();
 
-          saveImageToS3(base64Image);
           sendImageToBackend(base64Image);
           console.log("Sending image to backend server");
         }, 10000);
