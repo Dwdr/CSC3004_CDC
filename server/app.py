@@ -51,13 +51,57 @@ from_email = os.getenv("EMAIL_ADDRESS")
 password = os.getenv("EMAIL_PASSWORD")
 
 
+"""This function saves the image frame into an 
+   Amazon S3 bucket"""
+
+def save_image(image_data, uid, movement_value):
+    # Split the data URL to extract the base64 image data
+    image_data_parts = image_data.split(",", 1)
+    base64_image_data = image_data_parts[1]
+
+    # Convert the base64 image data from string to bytes
+    image_bytes = base64.b64decode(base64_image_data)
+
+    # # Specify the path and filename to save the image
+    # save_path = "C:\\Users\\jour2\\Downloads"
+
+    # Generate a unique filename
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    filename = f"image_{uid}_{timestamp}.png"
+
+    # # Save the image to the specified path
+    # with open(file_path, "wb") as file:
+    #     file.write(image_bytes)
+
+    # return "Image saved successfully"
+
+    # Crime has been detected
+    if movement_value == 1:
+        key = f"images/crime/{filename}"
+        s3.put_object(
+            Bucket=image_bucket_name,
+            Key=key,
+            Body=image_bytes,
+            ContentType="image/png"
+        )
+    else:
+        key = f"images/no_crime/{filename}"
+        # Upload image to the S3 bucket
+        s3.put_object(
+            Bucket=image_bucket_name,
+            Key=key,
+            Body=image_bytes,
+            ContentType="image/png"
+        )
+
+
 """This function is used to load the names of all the images stored in the S3 bucket.
    It returns a list of file names."""
 
-def load_cloud_images(uid):
+def load_cloud_images():
    # TODO: Somehow get the client's UID here
    # Construct the prefix to match the files
-   prefix = f"images_{uid}"
+   prefix = f"images"
 
    try:
         # List objects in the 'cdcimagebucket' with the specified prefix
@@ -229,6 +273,7 @@ def detect_frame_worker(client_id, image_data):
     has_crime = int(detect_crime(image_data))  # Convert boolean to integer
 
     if has_crime == 1:
+        save_image(image_data, client_id, 1)
         print("Crime detected")
         for device in connected_devices:
             if device["client_id"] == client_id:
@@ -238,6 +283,7 @@ def detect_frame_worker(client_id, image_data):
                     send_email(client_email)
                 break
     else:
+        save_image(image_data, client_id, 0)
         # Check if the client_id already exists in the connected_devices list
         existing_device = next(
             (
