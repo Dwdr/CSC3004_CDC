@@ -245,54 +245,7 @@ def detect(model, client_id, lm_list):
     socketio.emit("detection_result", {"client_id": client_id, "has_crime": has_crime})
 
 
-"""This function is used to detect crime in an image.
-   It takes in the image data as a base64-encoded string and returns True if the image contains violence, False otherwise."""
 
-
-def detect_crime(image_data):
-    print("Decoding image data...")
-    try:
-        # Load the pre-trained violence detection model
-        sgd = tf.keras.optimizers.legacy.SGD(
-            learning_rate=0.01, momentum=0.9, nesterov=True
-        )
-
-        model = load_model("modelnew.h5")
-        model.compile(
-            optimizer=tf.keras.optimizers.legacy.SGD(
-                learning_rate=0.01, momentum=0.9, nesterov=True
-            ),
-            loss="categorical_crossentropy",
-            metrics=["accuracy"],
-        )
-
-        # Convert the image data to a NumPy array
-        image = np.frombuffer(base64.b64decode(image_data.split(",")[1]), np.uint8)
-        image = cv2.imdecode(image, cv2.IMREAD_GRAYSCALE)
-
-        # Resize the image to the expected shape
-        image = cv2.resize(image, (128, 128))
-
-        # Convert the grayscale image to a 3-channel image
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-
-        # Expand dimensions to match the input shape of the model
-        image = np.expand_dims(image, axis=0)
-
-        # Predict whether the image contains violence
-        prediction = model.predict(image)
-
-        # Get the predicted class index
-        predicted_class = np.argmax(prediction, axis=1)[0]
-
-        print("Prediction:", prediction)
-        print("Predicted class:", predicted_class)
-
-        # Return True if the predicted class is 1 (violence), False otherwise
-        return int(predicted_class)
-    except Exception as e:
-        print("Error during image processing:", str(e))
-        return False
 
 
 @app.route("/")
@@ -327,81 +280,6 @@ def disconnect(client_uid):
         print(f"Client {client_uid} disconnected")
 
 
-"""Handles the detection of crime in a video frame on a separate thread"""
-
-
-def detect_frame_worker(client_id, image_data):
-    print("\nDetecting crime for client:", client_id, "\n")
-
-    has_crime = int(detect_crime(image_data))  # Convert boolean to integer
-
-    if has_crime == 1:
-        save_image(image_data, client_id, 1)
-        print("Crime detected")
-        for device in connected_devices:
-            if device["client_id"] == client_id:
-                device["has_crime"] = has_crime  # Update the 'has_crime' value
-                client_email = device["client_email"]
-                if client_email:
-                    send_email(client_email)
-                break
-    else:
-        save_image(image_data, client_id, 0)
-        # Check if the client_id already exists in the connected_devices list
-        existing_device = next(
-            (
-                device
-                for device in connected_devices
-                if device["client_id"] == client_id
-            ),
-            None,
-        )
-
-        if existing_device:
-            existing_device["has_crime"] = has_crime  # Update the 'has_crime' value
-        else:
-            # Add the device to the connected_devices list
-            connected_devices.append(
-                {
-                    "client_id": client_id,
-                    "has_crime": has_crime,
-                    "client_email": "",
-                }
-            )
-
-    print(connected_devices)
-
-    socketio.emit("detection_result", {"client_id": client_id, "has_crime": has_crime})
-
-
-""" This function is called when a client sends a detect-frame request to the server. Since the client is sending a POST request, we need to handle the OPTIONS request first.
-    The detect-frame request contains the client's unique ID and the image data. We create a new thread to process the image data and detect crime."""
-
-
-@app.route("/detect-frame", methods=["POST", "OPTIONS"])
-def handle_detect_frame():
-    if request.method == "OPTIONS":
-        # Respond to the preflight request
-        response = jsonify({})
-        response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add("Access-Control-Allow-Headers", "*")
-        response.headers.add("Access-Control-Allow-Methods", "*")
-        return response
-
-    try:
-        image_data = request.json["image"]
-        uid_data = request.json["uid"]
-        thread = threading.Thread(
-            target=detect_frame_worker,
-            args=(uid_data, image_data),
-        )
-        thread.start()
-        print("Thread started for client:", uid_data)
-    except Exception as e:
-        print("Error handling detect-frame request:", str(e))
-        socketio.emit("detection_result", {"status": "0"})
-
-    return jsonify({}), 200
 
 
 @app.route("/collect-frames", methods=["POST", "OPTIONS"])
