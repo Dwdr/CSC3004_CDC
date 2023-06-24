@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: app-deployment
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: app
@@ -18,6 +18,8 @@ spec:
           env:
             - name: PORT
               value: "8000"
+
+            #Specify NodePort Service Port for the Server
             - name: SERVER_PORT
               value: "30081"
           ports:
@@ -73,3 +75,26 @@ spec:
       targetPort: 8001
       nodePort: 30081
       name: server-port
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /client
+            pathType: Prefix
+            backend:
+              service:
+                name: app-service
+                port:
+                  number: 8000
+          - path: /server
+            pathType: Prefix
+            backend:
+              service:
+                name: app-service
+                port:
+                  number: 8001
