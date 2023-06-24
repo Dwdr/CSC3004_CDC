@@ -9,3 +9,4 @@ flask-socketio
 simple-websocket
 Pillow
 keras
+mediapipe
