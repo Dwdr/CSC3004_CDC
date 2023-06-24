@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: client
+          image: aviendre/cdc_3004-client:latest
+          env:
+            - name: PORT
+              value: "8000"
+            - name: SERVER_PORT
+              value: "30081"
+          ports:
+            - containerPort: 8000
+        - name: server
+          image: aviendre/cdc_3004-server:latest
+          env:
+            - name: PORT
+              value: "8001"
+            - name: AWS_ACCESS_KEY_ID
+              value: #AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              value: #AWS_SECRET_ACCESS_KEY
+            - name: AWS_REGION
+              value: #AWS_REGION
+            - name: AWS_VIDEO_BUCKET_NAME
+              value: #AWS_VIDEO_BUCKET_NAME
+            - name: AWS_VIDEO_BUCKET_PREFIX
+              value: #AWS_VIDEO_BUCKET_PREFIX
+            - name: AWS_IMAGE_BUCKET_NAME
+              value: #AWS_IMAGE_BUCKET_NAME
+            - name: AWS_IMAGE_BUCKET_PREFIX
+              value: #AWS_IMAGE_BUCKET_PREFIX
+            - name: AWS_ANALYSIS_BUCKET_NAME
+              value: #AWS_ANALYSIS_BUCKET_NAME
+            - name: AWS_ANALYSIS_BUCKET_PREFIX
+              value: #AWS_ANALYSIS_BUCKET_PREFIX
+            - name: EMAIL_ADDRESS
+              value: #EMAIL_ADDRESS
+            - name: EMAIL_PASSWORD
+              value: #EMAIL_PASSWORD
+            - name: SMTP_SERVER
+              value: #SMTP_SERVER
+          ports:
+            - containerPort: 8001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service
+spec:
+  type: NodePort
+  selector:
+    app: app
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      nodePort: 30080
+      name: client-port
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001
+      nodePort: 30081
+      name: server-port

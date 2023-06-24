@@ -29,6 +29,7 @@ connected_devices = []
 access_key = os.getenv("AWS_ACCESS_KEY_ID")
 secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
 region_name = os.getenv("AWS_REGION")
+port = os.getenv("PORT")
 
 # Specify the S3 bucket name and target path
 s3 = boto3.client(
@@ -396,4 +397,4 @@ def before_request():
 
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=8001, allow_unsafe_werkzeug=True)
+    socketio.run(app, host="0.0.0.0", port=port, allow_unsafe_werkzeug=True)

@@ -8,8 +8,9 @@ COPY client/requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY client .
 
 EXPOSE 8000
+EXPOSE 30080
 
 CMD ["python3", "app.py"]

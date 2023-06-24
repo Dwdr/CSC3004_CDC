@@ -9,8 +9,9 @@ COPY server/requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY server .
 
 EXPOSE 8001
+EXPOSE 30081
 
 CMD ["python3", "app.py"]

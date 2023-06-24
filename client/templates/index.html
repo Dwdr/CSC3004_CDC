@@ -38,8 +38,9 @@
       var emailButton = document.getElementById("emailButton");
       var emailText = document.getElementById("emailText");
       var changeEmailButton = document.getElementById("changeEmailButton");
+      var port = parseInt(process.env.SERVER_PORT);
 
-      var socket = io("http://127.0.0.1:8001");
+      var socket = io("http://127.0.0.1:" + port);
 
       violenceStatus.textContent = "Detecting...";
       serverStatus.textContent = "Connecting to the server...";
@@ -139,9 +140,8 @@
         }, 10000);
       }
 
-
       function changeEmail() {
-        fetch("http://127.0.0.1:8001/remove-email", {
+        fetch("http://127.0.0.1:" + port + "/remove-email", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -185,7 +185,7 @@
 
       function sendEmailToBackend(email) {
         var email = emailInput.value;
-        fetch("http://127.0.0.1:8001/add-email", {
+        fetch("http://127.0.0.1:" + port + "/add-email", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -213,7 +213,7 @@
       }
 
       function sendImageToBackend(imageData) {
-        fetch("http://127.0.0.1:8001/detect-frame", {
+        fetch("http://127.0.0.1:" + port + "/detect-frame", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

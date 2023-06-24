@@ -45,7 +45,7 @@
       const fileNamesTableBody = document.getElementById("file-names-body");
 
       // Make a GET request to the Flask route "/file-names" to retrieve the file names
-      fetch("http://127.0.0.1:8001/file-names")
+      fetch("http://127.0.0.1:" + location.port + "/file-names")
         .then((response) => response.json())
         .then((data) => {
           const fileNames = data.fileNames;
@@ -86,7 +86,7 @@
       }
 
       function updateDashboard() {
-        fetch("http://127.0.0.1:8001/connected-devices")
+        fetch("http://127.0.0.1:" + location.port + "/connected-devices")
           .then((response) => response.json())
           .then((data) => {
             const connectedDevices = data;
