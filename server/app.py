@@ -1,3 +1,9 @@
+"""
+app.py
+
+This is the main Flask application file for the client web application.
+"""
+
 import base64
 import datetime
 import os
@@ -11,24 +17,21 @@ import boto3
 import cv2
 import numpy as np
 
-import tensorflow as tf
 from PIL import Image
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
-from tensorflow.keras.models import load_model
-from tensorflow.keras.optimizers import SGD
+from flask_socketio import SocketIO
 import keras
 import mediapipe as mp
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
-load_dotenv()  # Load environment variables
+load_dotenv()
 
 connected_devices = []
-landmark_list = []
+landmark_lists = {}
 
 # Load the model
 model = keras.models.load_model("lstm-model.h5")
@@ -58,26 +61,49 @@ image_bucket_prefix = os.getenv("AWS_IMAGE_BUCKET_PREFIX")
 analysis_bucket_name = os.getenv("AWS_ANALYSIS_BUCKET_NAME")
 analysis_bucket_prefix = os.getenv("AWS_ANALYSIS_BUCKET_PREFIX")
 
+# Specify the Email address, password and SMTP server
 from_email = os.getenv("EMAIL_ADDRESS")
 password = os.getenv("EMAIL_PASSWORD")
 smtp = os.getenv("SMTP_SERVER")
 
 
 def make_landmark_timestep(results):
+    """
+    Converts pose landmark data from the results object to a list of coordinates.
+
+    Args:
+        results: An object containing pose landmark data.
+
+    Returns:
+        A list of coordinates representing the pose landmarks.
+        Each coordinate consists of the x, y, z, and visibility values of a landmark.
+    """
     c_lm = []
-    for id, lm in enumerate(results.pose_landmarks.landmark):
-        c_lm.append(lm.x)
-        c_lm.append(lm.y)
-        c_lm.append(lm.z)
-        c_lm.append(lm.visibility)
+    for id, landmark in enumerate(results.pose_landmarks.landmark):
+        c_lm.append(landmark.x)
+        c_lm.append(landmark.y)
+        c_lm.append(landmark.z)
+        c_lm.append(landmark.visibility)
     return c_lm
 
 
-"""This function saves the image frame into an 
-   Amazon S3 bucket"""
-
-
 def save_image(image_data, uid, movement_value):
+    """
+    Saves an image to an S3 bucket based on the provided image data and movement value.
+
+    Args:
+        image_data (str): The data URL of the image in base64 format.
+        uid (str): The unique identifier associated with the image.
+        movement_value (int): The value indicating the presence of movement
+        (1 if movement detected, else 0).
+
+    Raises:
+        ValueError: If the image data is not in a valid format or if the movement value is invalid.
+
+    Returns:
+        None
+    """
+
     # Split the data URL to extract the base64 image data
     image_data_parts = image_data.split(",", 1)
     base64_image_data = image_data_parts[1]
@@ -103,11 +129,16 @@ def save_image(image_data, uid, movement_value):
         )
 
 
-"""This function is used to load the names of all the images stored in the S3 bucket.
-   It returns a list of file names."""
-
-
 def load_cloud_images():
+    """
+    Loads file names of images from an S3 bucket.
+
+    Returns:
+        list: A list of file names of images stored in the S3 bucket.
+
+    Raises:
+        None
+    """
     try:
         # Initialize an empty list to store the file names
         file_names = []
@@ -134,16 +165,24 @@ def load_cloud_images():
         # Return the list of file names
         return file_names
 
-    except Exception as e:
-        print(f"Error loading images from S3: {e}")
+    except Exception as error:
+        print(f"Error loading images from S3: {error}")
         return []
 
 
-"""This function is used to send a notification to a user if a crime has been detected.
-   It takes in the user's email address as a parameter."""
-
-
 def send_email(to_email):
+    """
+    Sends an email notification.
+
+    Args:
+        to_email (str): The email address of the recipient.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
     # Compose the email content
     subject = "Crime Detected"
     body = "A crime has been detected."
@@ -154,24 +193,32 @@ def send_email(to_email):
     msg["To"] = to_email
 
     try:
-        port = 465
+        email_port = 465
         context = ssl.create_default_context()
-        # modify the smtp server according to your email provider
-        with smtplib.SMTP_SSL(smtp, port, context=context) as server:
+        # modify the SMTP server according to your email provider
+        with smtplib.SMTP_SSL(smtp, email_port, context=context) as server:
             server.login(from_email, password)
             server.sendmail(from_email, to_email, msg.as_string())
             server.quit()
 
         print("Email sent successfully")
-    except Exception as e:
-        print("Error sending email:", str(e))
-
-
-"""This function is used to send a welcome email to a new user.
-   It takes in the user's email address as a parameter."""
+    except Exception as error:
+        print("Error sending email:", str(error))
 
 
 def send_welcome_email(to_email):
+    """
+    Sends a welcome email to a new user.
+
+    Args:
+        to_email (str): The email address of the recipient.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
     subject = "Welcome to the System"
     body = "Welcome to our system! Thank you for joining."
 
@@ -181,29 +228,55 @@ def send_welcome_email(to_email):
     msg["To"] = to_email
 
     try:
-        port = 465
+        email_port = 465
         context = ssl.create_default_context()
         # modify the smtp server according to your email provider
-        with smtplib.SMTP_SSL(smtp, port, context=context) as server:
+        with smtplib.SMTP_SSL(smtp, email_port, context=context) as server:
             server.login(from_email, password)
             server.sendmail(from_email, to_email, msg.as_string())
             server.quit()
 
         print("Welcome email sent successfully")
-    except Exception as e:
-        print("Error sending welcome email:", str(e))
+    except Exception as error:
+        print("Error sending welcome email:", str(error))
 
 
 def add_padding(image_data):
+    """
+    Adds padding to the image data string to ensure it has a length that is a multiple of 4.
+
+    Args:
+        image_data (str): The image data string.
+
+    Returns:
+        str: The image data string with added padding.
+
+    Raises:
+        None
+    """
     padding = 4 - (len(image_data) % 4)
     image_data += "=" * padding
     return image_data
 
 
-def detect(model, client_id, lm_list):
+def detect(model_file, client_id, lm_list):
+    """
+    Performs crime detection based on landmark data using a given model.
+
+    Args:
+        model: The crime detection model.
+        client_id: The client ID associated with the landmark data.
+        lm_list: A list of landmark data.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
     lm_list = np.array(lm_list)
     lm_list = np.expand_dims(lm_list, axis=0)
-    result = model.predict(lm_list)
+    result = model_file.predict(lm_list)
     if result[0][0] > 0.5:
         label = "Violent"
     else:
@@ -245,29 +318,41 @@ def detect(model, client_id, lm_list):
     socketio.emit("detection_result", {"client_id": client_id, "has_crime": has_crime})
 
 
-
-
-
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-
-@app.route("/file-names", methods=["GET"])
-def file_names():
-    return {"fileNames": load_cloud_images()}
-
-
-# This function is called when a client connects to the server
 @socketio.on("connect")
 def handle_connect():
+    """
+    Event handler for client connection.
+
+    Sends a detection result message with status "1" to the client and prints
+    a log message indicating client connection.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
     socketio.emit("detection_result", {"status": "1"})
     print("Client connected")
 
 
-# This function is called when a client disconnects from the server
 @socketio.on("disconnect")
 def disconnect(client_uid):
+    """
+    Event handler for client disconnection.
+
+    Removes the disconnected client from the connected_devices list based on
+    the provided client_uid and prints a log message indicating client disconnection.
+
+    Args:
+        client_uid (str): The unique identifier of the client.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
     device_to_remove = None
 
     for device in connected_devices:
@@ -280,11 +365,54 @@ def disconnect(client_uid):
         print(f"Client {client_uid} disconnected")
 
 
+@app.route("/")
+def index():
+    """
+    Renders the index.html template.
+
+    Returns:
+        The rendered index.html template.
+
+    Raises:
+        None
+    """
+    return render_template("index.html")
+
+
+@app.route("/file-names", methods=["GET"])
+def get_file_names():
+    """
+    Retrieves the list of file names from the cloud storage.
+
+    Returns:
+        A dictionary containing the list of file names under the key "fileNames".
+
+    Raises:
+        None
+    """
+    return {"fileNames": load_cloud_images()}
 
 
 @app.route("/collect-frames", methods=["POST", "OPTIONS"])
 def handle_collect_frames():
-    global landmark_list
+    """
+    Request handler for collecting frames.
+
+    Collects frames sent by clients and performs frame processing,
+     including landmark extraction and detection.
+
+    Returns a response with appropriate status codes and data.
+
+    Args:
+        None
+
+    Returns:
+        response (flask.Response): The HTTP response.
+
+    Raises:
+        None
+    """
+    global landmark_lists
     if request.method == "OPTIONS":
         # Respond to the preflight request
         response = jsonify({})
@@ -302,42 +430,58 @@ def handle_collect_frames():
         try:
             image = Image.open(io.BytesIO(decoded_image_data), formats=["png"])
             image_np = np.array(image)
-        except (IOError, OSError) as e:
-            print("Error: Failed to open the image:", str(e))
+        except (IOError, OSError) as error:
+            print("Error: Failed to open the image:", str(error))
 
         frameRGB = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
         results = pose.process(frameRGB)
 
         if results.pose_landmarks:
-            lm = make_landmark_timestep(results)
-            landmark_list.append(lm)
-            print("Landmark list length:", len(landmark_list))
+            landmark = make_landmark_timestep(results)
 
-            if len(landmark_list) == 20:
-                t1 = threading.Thread(
+            if uid_data not in landmark_lists:
+                landmark_lists[uid_data] = []
+            landmark_lists[uid_data].append(landmark)
+            print("Landmark list length:", len(landmark_lists))
+
+            if len(landmark_lists[uid_data]) == 20:
+                thread = threading.Thread(
                     target=detect,
                     args=(
                         model,
                         uid_data,
-                        landmark_list,
+                        landmark_lists[uid_data],
                     ),
                 )
-                t1.start()
-                landmark_list = []
+                thread.start()
+                landmark_lists[uid_data] = []
                 print("Thread started for client:", uid_data)
 
-    except Exception as e:
-        print("Error handlingcollect-frame request:", str(e))
+    except Exception as error:
+        print("Error handlingcollect-frame request:", str(error))
         socketio.emit("detection_result", {"status": "0"})
 
     return jsonify({}), 200
 
 
-"""This function is called when a client sends a get-connected-devices request to the server. It returns a list of all the connected devices."""
-
-
 @app.route("/connected-devices", methods=["GET"])
 def get_connected_devices():
+    """
+    Retrieves the list of connected devices.
+
+    Returns the list of connected devices along with
+    their client IDs, crime status, and client emails.
+
+    Args:
+        None
+
+    Returns:
+        response (flask.Response): The HTTP response
+        containing the list of connected devices.
+
+    Raises:
+        None
+    """
     devices = []
     for device in connected_devices:
         client_id = device["client_id"]
@@ -353,11 +497,27 @@ def get_connected_devices():
     return jsonify(devices)
 
 
-"""This function is called when a client sends an add-email request to the server. It adds the client's email address to the connected_devices list."""
-
-
 @app.route("/add-email", methods=["POST"])
 def add_email():
+    """
+    Adds the client email to a connected device.
+
+    Retrieves the client email and client ID from the request
+    data and associates the email with the corresponding
+    connected device. If the device is not found in the
+    connected_devices list, a new entry is created.
+    Additionally, a welcome email is sent to the client
+    email address. Finally, it returns an empty response with a 200 status code.
+
+    Args:
+        None
+
+    Returns:
+        response (flask.Response): The empty HTTP response.
+
+    Raises:
+        None
+    """
     email = request.json["email"]
     uid = request.json["uid"]
     found = False
@@ -379,11 +539,28 @@ def add_email():
     return jsonify({}), 200
 
 
-"""This function is called when a client sends a remove-email request to the server. It removes the client's email address from the connected_devices list."""
-
-
 @app.route("/remove-email", methods=["POST"])
 def remove_email():
+    """
+    Removes the client email from a connected device.
+
+    Retrieves the client email and client ID from the
+    request data and searches for a matching device in the
+    connected_devices list. If a match is found, the
+    client email is removed from the device. If no match is found,
+    it returns a JSON response with an error
+    message and a 404 status code.
+
+    Args:
+        None
+
+    Returns:
+        response (flask.Response): The JSON response
+        indicating the success or failure of the operation.
+
+    Raises:
+        None
+    """
     email = request.json["email"]
     uid = request.json["uid"]
     for device in connected_devices:
@@ -395,6 +572,22 @@ def remove_email():
 
 @app.before_request
 def before_request():
+    """
+    Middleware function executed before each request.
+
+    Checks if the request method is POST and the request
+    path is '/detect-frame'. If the conditions are met, it sets
+    the 'CONTENT_TYPE' of the request environment to 'application/json'.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
     if request.method == "POST" and request.path == "/detect-frame":
         request.environ["CONTENT_TYPE"] = "application/json"
 
