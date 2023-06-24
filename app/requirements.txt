@@ -1,5 +1,0 @@
-flask
-opencv-python
-moviepy
-boto3
-python-dotenv
