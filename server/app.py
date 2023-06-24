@@ -1,41 +1,34 @@
-from flask import (
-    Flask, 
-    render_template, 
-    request, 
-    jsonify
-)
-
-# from keras.models import load_model
-# from keras.optimizers import SGD
-import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.optimizers import SGD
-from flask_socketio import SocketIO, emit
-from flask_cors import CORS
-from email.mime.text import MIMEText
-from dotenv import load_dotenv
-
 import base64
-import boto3
 import datetime
+import os
+import smtplib
+import ssl
+import threading
+from email.mime.text import MIMEText
+
+import boto3
 import cv2
 import numpy as np
-import os
-import threading
-import smtplib, ssl
-import requests
+
+import tensorflow as tf
+from dotenv import load_dotenv
+from flask import Flask, jsonify, render_template, request
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit
+from tensorflow.keras.models import load_model
+from tensorflow.keras.optimizers import SGD
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app)
-load_dotenv() # Load environment variables
+load_dotenv()  # Load environment variables
 
 connected_devices = []
 
 # Configure AWS access keys and region
 access_key = os.getenv("AWS_ACCESS_KEY_ID")
 secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-region_name = "ap-southeast-1"
+region_name = os.getenv("AWS_REGION")
 
 # Specify the S3 bucket name and target path
 s3 = boto3.client(
@@ -44,19 +37,21 @@ s3 = boto3.client(
     aws_secret_access_key=secret_key,
     region_name=region_name,
 )
-video_bucket_name = "cdcvideobucket"
-video_bucket_prefix = "videos/"
-image_bucket_name = "cdcimagebucket"
-image_bucket_prefix = "images/"
-analysis_bucket_name = "cdcanalysisbucket"
-analysis_bucket_prefix = "analysis/"
+video_bucket_name = os.getenv("AWS_VIDEO_BUCKET_NAME")
+video_bucket_prefix = os.getenv("AWS_VIDEO_BUCKET_PREFIX")
+image_bucket_name = os.getenv("AWS_IMAGE_BUCKET_NAME")
+image_bucket_prefix = os.getenv("AWS_IMAGE_BUCKET_PREFIX")
+analysis_bucket_name = os.getenv("AWS_ANALYSIS_BUCKET_NAME")
+analysis_bucket_prefix = os.getenv("AWS_ANALYSIS_BUCKET_PREFIX")
 
 from_email = os.getenv("EMAIL_ADDRESS")
 password = os.getenv("EMAIL_PASSWORD")
+smtp = os.getenv("SMTP_SERVER")
 
 
 """This function saves the image frame into an 
    Amazon S3 bucket"""
+
 
 def save_image(image_data, uid, movement_value):
     # Split the data URL to extract the base64 image data
@@ -74,55 +69,48 @@ def save_image(image_data, uid, movement_value):
     if movement_value == 1:
         key = f"images/crime/{filename}"
         s3.put_object(
-            Bucket=image_bucket_name,
-            Key=key,
-            Body=image_bytes,
-            ContentType="image/png"
+            Bucket=image_bucket_name, Key=key, Body=image_bytes, ContentType="image/png"
         )
     else:
         key = f"images/no_crime/{filename}"
         # Upload image to the S3 bucket
         s3.put_object(
-            Bucket=image_bucket_name,
-            Key=key,
-            Body=image_bytes,
-            ContentType="image/png"
+            Bucket=image_bucket_name, Key=key, Body=image_bytes, ContentType="image/png"
         )
 
 
 """This function is used to load the names of all the images stored in the S3 bucket.
    It returns a list of file names."""
 
+
 def load_cloud_images():
-   try:
+    try:
         # Initialize an empty list to store the file names
         file_names = []
 
         # List objects in the 'cdcimagebucket' with the specified prefix
         crime_response = s3.list_objects_v2(
-            Bucket=image_bucket_name,
-            Prefix=image_bucket_prefix + "crime/"
+            Bucket=image_bucket_name, Prefix=image_bucket_prefix + "crime/"
         )
 
         # Iterate over the objects and add the file names to the list
-        for obj in crime_response.get('Contents', []):
-            key = obj['Key']
+        for obj in crime_response.get("Contents", []):
+            key = obj["Key"]
             # Add the file name to the list
             file_names.append(key)
 
         no_crime_response = s3.list_objects_v2(
-            Bucket=image_bucket_name,
-            Prefix=image_bucket_prefix + "no_crime/"
+            Bucket=image_bucket_name, Prefix=image_bucket_prefix + "no_crime/"
         )
 
-        for obj in no_crime_response.get('Contents', []):
-            key = obj['Key']
+        for obj in no_crime_response.get("Contents", []):
+            key = obj["Key"]
             file_names.append(key)
-        
+
         # Return the list of file names
         return file_names
-   
-   except Exception as e:
+
+    except Exception as e:
         print(f"Error loading images from S3: {e}")
         return []
 
@@ -132,7 +120,6 @@ def load_cloud_images():
 
 
 def send_email(to_email):
-
     # Compose the email content
     subject = "Crime Detected"
     body = "A crime has been detected."
@@ -146,7 +133,7 @@ def send_email(to_email):
         port = 465
         context = ssl.create_default_context()
         # modify the smtp server according to your email provider
-        with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
+        with smtplib.SMTP_SSL(smtp, port, context=context) as server:
             server.login(from_email, password)
             server.sendmail(from_email, to_email, msg.as_string())
             server.quit()
@@ -159,8 +146,8 @@ def send_email(to_email):
 """This function is used to send a welcome email to a new user.
    It takes in the user's email address as a parameter."""
 
-def send_welcome_email(to_email):
 
+def send_welcome_email(to_email):
     subject = "Welcome to the System"
     body = "Welcome to our system! Thank you for joining."
 
@@ -173,7 +160,7 @@ def send_welcome_email(to_email):
         port = 465
         context = ssl.create_default_context()
         # modify the smtp server according to your email provider
-        with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
+        with smtplib.SMTP_SSL(smtp, port, context=context) as server:
             server.login(from_email, password)
             server.sendmail(from_email, to_email, msg.as_string())
             server.quit()
@@ -263,6 +250,7 @@ def disconnect(client_uid):
     if device_to_remove:
         connected_devices.remove(device_to_remove)
         print(f"Client {client_uid} disconnected")
+
 
 """Handles the detection of crime in a video frame on a separate thread"""
 
@@ -408,4 +396,4 @@ def before_request():
 
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=8001)
+    socketio.run(app, host="0.0.0.0", port=8001, allow_unsafe_werkzeug=True)

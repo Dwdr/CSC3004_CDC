@@ -1,4 +1,9 @@
-flask
-keras
 boto3
+opencv-python
+numpy
+tensorflow
 python-dotenv
+flask
+flask-cors
+flask-socketio
+simple-websocket
