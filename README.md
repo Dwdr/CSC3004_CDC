@@ -4,7 +4,46 @@ This repository contains the code for a crime detection system. The system is bu
 
 ## Installation
 
-Ensure you have AWS S3 for this project to work. To set up the crime detection system, you may use either Docker or Python:
+Ensure you have AWS S3 for this project to work. To set up the crime detection system, you may use either Docker, Kubernetes or Python:
+
+### Kubernetes Setup
+
+1. Clone the repository:
+
+```
+git clone https://github.com/Dwdr/CSC3004_CDC
+```
+
+2. Modify the `app-deployment.yaml` with the environment variables with the following variables:
+
+#### Client
+
+- `PORT`: Port number of the client
+- `SERVER_PORT`: Kubernetes NodePort for the server deployment
+
+#### Server
+
+- `PORT`: Port number of the server
+- `AWS_ACCESS_KEY_ID`: AWS access key ID for accessing S3 bucket
+- `AWS_SECRET_ACCESS_KEY`: AWS secret access key for accessing S3 bucket
+- `AWS_REGION: AWS region` where the S3 bucket is located
+- `AWS_VIDEO_BUCKET_NAME`: Name of the S3 bucket to store videos
+- `AWS_VIDEO_BUCKET_PREFIX`: Prefix for video objects in the S3 bucket
+- `AWS_IMAGE_BUCKET_NAME`: Name of the S3 bucket to store images
+- `AWS_IMAGE_BUCKET_PREFIX`: Prefix for image objects in the S3 bucket
+- `AWS_ANALYSIS_BUCKET_NAME`: Name of the S3 bucket to store analysis results
+- `AWS_ANALYSIS_BUCKET_PREFIX`: Prefix for analysis result objects in the S3 bucket
+- `EMAIL_ADDRESS`: Email address for sending notifications
+- `EMAIL_PASSWORD`: Password for the email address
+- `SMTP_SERVER`: SMTP server address for sending emails
+
+3. Deploy the application to Kubernetes by applying the YAML files:
+
+```
+kubectl apply -f app-development.yaml
+```
+
+The client should be accessible via the NodePort or LoadBalancer service created for the client application. The server dashboard should be accessible via the NodePort or LoadBalancer service created for the server application.
 
 ### Docker Setup
 
@@ -23,6 +62,7 @@ cp .env.template .env
 
 3. Modify the environment variables within the `.env` file with the following variables:
 
+- `PORT`: Port number for the server
 - `AWS_ACCESS_KEY_ID`: AWS access key ID for accessing S3 bucket
 - `AWS_SECRET_ACCESS_KEY`: AWS secret access key for accessing S3 bucket
 - `AWS_REGION: AWS region` where the S3 bucket is located
@@ -36,7 +76,19 @@ cp .env.template .env
 - `EMAIL_PASSWORD`: Password for the email address
 - `SMTP_SERVER`: SMTP server address for sending emails
 
-3. Ensure that Docker is running and run the following command: ` docker compose up`
+4. Set up the environment variables for the server. Run the following command:
+
+```
+cd client
+cp .env.template .env
+```
+
+5. Modify the environment variables within the `.env` file with the following variables:
+
+- `PORT`: Port number for the server
+- `SERVER_PORT`: Port number for the server
+
+6. Ensure that Docker is running and run the following command: ` docker compose up`
 
 Client should now be accessible via `127.0.0.1:8000`. Server dashboard should now be accessible via `127.0.0.1:8001`
 
@@ -70,14 +122,26 @@ cp .env.template .env
 - `EMAIL_PASSWORD`: Password for the email address
 - `SMTP_SERVER`: SMTP server address for sending emails
 
-3. Run the client by executing the following command:
+4. Set up the environment variables for the server. Run the following command:
+
+```
+cd client
+cp .env.template .env
+```
+
+5. Modify the environment variables within the `.env` file with the following variables:
+
+- `PORT`: Port number for the server
+- `SERVER_PORT`: Port number for the server
+
+6. Run the client by executing the following command:
 
 ```
 cd client
 python app.py
 ```
 
-4. Run the server by executing the following command:
+7. Run the server by executing the following command:
 
 ```
 cd server
