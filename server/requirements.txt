@@ -7,3 +7,5 @@ flask
 flask-cors
 flask-socketio
 simple-websocket
+Pillow
+keras
