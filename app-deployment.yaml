@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: app-deployment
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: app
@@ -30,31 +30,51 @@ spec:
             - name: PORT
               value: "8001"
             - name: AWS_ACCESS_KEY_ID
-              value: #AWS_ACCESS_KEY_ID
+              value: AKIATATDQXXRG65H6AUH
             - name: AWS_SECRET_ACCESS_KEY
-              value: #AWS_SECRET_ACCESS_KEY
+              value: 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
             - name: AWS_REGION
-              value: #AWS_REGION
+              value: ap-southeast-1
             - name: AWS_VIDEO_BUCKET_NAME
-              value: #AWS_VIDEO_BUCKET_NAME
+              value: cdcvideobucket
             - name: AWS_VIDEO_BUCKET_PREFIX
-              value: #AWS_VIDEO_BUCKET_PREFIX
+              value: videos/
             - name: AWS_IMAGE_BUCKET_NAME
-              value: #AWS_IMAGE_BUCKET_NAME
+              value: cdcimagebucket
             - name: AWS_IMAGE_BUCKET_PREFIX
-              value: #AWS_IMAGE_BUCKET_PREFIX
+              value: images/
             - name: AWS_ANALYSIS_BUCKET_NAME
-              value: #AWS_ANALYSIS_BUCKET_NAME
+              value: cdcanalysisbucket
             - name: AWS_ANALYSIS_BUCKET_PREFIX
-              value: #AWS_ANALYSIS_BUCKET_PREFIX
+              value: analysis/
             - name: EMAIL_ADDRESS
-              value: #EMAIL_ADDRESS
+              value: ridhwanproper@gmail.com
             - name: EMAIL_PASSWORD
-              value: #EMAIL_PASSWORD
+              value: kdymcgvlkzehfqjb
             - name: SMTP_SERVER
-              value: #SMTP_SERVER
+              value: smtp.gmail.com
           ports:
             - containerPort: 8001
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: app-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: app-deployment
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+
 ---
 apiVersion: v1
 kind: Service
