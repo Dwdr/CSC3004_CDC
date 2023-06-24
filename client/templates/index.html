@@ -38,7 +38,7 @@
       var emailButton = document.getElementById("emailButton");
       var emailText = document.getElementById("emailText");
       var changeEmailButton = document.getElementById("changeEmailButton");
-      var port = parseInt(process.env.SERVER_PORT);
+      var port = {{ server_port }};
 
       var socket = io("http://127.0.0.1:" + port);
 
@@ -128,17 +128,21 @@
       });
 
       function enableRecording() {
-        setInterval(function () {
+        var frameCount = 0; // Track the number of frames captured
+        var interval = setInterval(function () {
+          console.log("Capturing frame");
           var canvas = document.createElement("canvas");
           var context = canvas.getContext("2d");
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
           var base64Image = canvas.toDataURL();
-
           sendImageToBackend(base64Image);
           console.log("Sending image to backend server");
-        }, 10000);
+
+          frameCount++;
+        }, 1000);
       }
+
 
       function changeEmail() {
         fetch("http://127.0.0.1:" + port + "/remove-email", {
@@ -213,7 +217,7 @@
       }
 
       function sendImageToBackend(imageData) {
-        fetch("http://127.0.0.1:" + port + "/detect-frame", {
+        fetch("http://127.0.0.1:" + port + "/collect-frames", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

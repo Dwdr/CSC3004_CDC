@@ -4,6 +4,7 @@ import os
 import smtplib
 import ssl
 import threading
+import io
 from email.mime.text import MIMEText
 
 import boto3
@@ -11,12 +12,15 @@ import cv2
 import numpy as np
 
 import tensorflow as tf
+from PIL import Image
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import SGD
+import keras
+import mediapipe as mp
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -24,6 +28,15 @@ CORS(app)
 load_dotenv()  # Load environment variables
 
 connected_devices = []
+landmark_list = []
+
+# Load the model
+model = keras.models.load_model("lstm-model.h5")
+
+# Initialise pose detection
+mpPose = mp.solutions.pose
+pose = mpPose.Pose()
+mpDraw = mp.solutions.drawing_utils
 
 # Configure AWS access keys and region
 access_key = os.getenv("AWS_ACCESS_KEY_ID")
@@ -48,6 +61,16 @@ analysis_bucket_prefix = os.getenv("AWS_ANALYSIS_BUCKET_PREFIX")
 from_email = os.getenv("EMAIL_ADDRESS")
 password = os.getenv("EMAIL_PASSWORD")
 smtp = os.getenv("SMTP_SERVER")
+
+
+def make_landmark_timestep(results):
+    c_lm = []
+    for id, lm in enumerate(results.pose_landmarks.landmark):
+        c_lm.append(lm.x)
+        c_lm.append(lm.y)
+        c_lm.append(lm.z)
+        c_lm.append(lm.visibility)
+    return c_lm
 
 
 """This function saves the image frame into an 
@@ -169,6 +192,57 @@ def send_welcome_email(to_email):
         print("Welcome email sent successfully")
     except Exception as e:
         print("Error sending welcome email:", str(e))
+
+
+def add_padding(image_data):
+    padding = 4 - (len(image_data) % 4)
+    image_data += "=" * padding
+    return image_data
+
+
+def detect(model, client_id, lm_list):
+    lm_list = np.array(lm_list)
+    lm_list = np.expand_dims(lm_list, axis=0)
+    result = model.predict(lm_list)
+    if result[0][0] > 0.5:
+        label = "Violent"
+    else:
+        label = "Neutral"
+
+    if label == "Violent":
+        print("Crime detected")
+        has_crime = 1
+        for device in connected_devices:
+            if device["client_id"] == client_id:
+                device["has_crime"] = has_crime  # Update the 'has_crime' value
+                client_email = device["client_email"]
+                if client_email:
+                    send_email(client_email)
+                break
+    else:
+        has_crime = 0
+        # Check if the client_id already exists in the connected_devices list
+        existing_device = next(
+            (
+                device
+                for device in connected_devices
+                if device["client_id"] == client_id
+            ),
+            None,
+        )
+
+        if existing_device:
+            existing_device["has_crime"] = has_crime  # Update the 'has_crime' value
+        else:
+            # Add the device to the connected_devices list
+            connected_devices.append(
+                {
+                    "client_id": client_id,
+                    "has_crime": has_crime,
+                    "client_email": "",
+                }
+            )
+    socketio.emit("detection_result", {"client_id": client_id, "has_crime": has_crime})
 
 
 """This function is used to detect crime in an image.
@@ -325,6 +399,57 @@ def handle_detect_frame():
         print("Thread started for client:", uid_data)
     except Exception as e:
         print("Error handling detect-frame request:", str(e))
+        socketio.emit("detection_result", {"status": "0"})
+
+    return jsonify({}), 200
+
+
+@app.route("/collect-frames", methods=["POST", "OPTIONS"])
+def handle_collect_frames():
+    global landmark_list
+    if request.method == "OPTIONS":
+        # Respond to the preflight request
+        response = jsonify({})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "*")
+        response.headers.add("Access-Control-Allow-Methods", "*")
+        return response
+
+    try:
+        uid_data = request.json["uid"]
+        image_data = request.json["image"]
+        image_data_cleaning = image_data.split(",")[1]
+        padded_image_data = add_padding(image_data_cleaning)
+        decoded_image_data = base64.urlsafe_b64decode(padded_image_data)
+        try:
+            image = Image.open(io.BytesIO(decoded_image_data), formats=["png"])
+            image_np = np.array(image)
+        except (IOError, OSError) as e:
+            print("Error: Failed to open the image:", str(e))
+
+        frameRGB = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+        results = pose.process(frameRGB)
+
+        if results.pose_landmarks:
+            lm = make_landmark_timestep(results)
+            landmark_list.append(lm)
+            print("Landmark list length:", len(landmark_list))
+
+            if len(landmark_list) == 20:
+                t1 = threading.Thread(
+                    target=detect,
+                    args=(
+                        model,
+                        uid_data,
+                        landmark_list,
+                    ),
+                )
+                t1.start()
+                landmark_list = []
+                print("Thread started for client:", uid_data)
+
+    except Exception as e:
+        print("Error handlingcollect-frame request:", str(e))
         socketio.emit("detection_result", {"status": "0"})
 
     return jsonify({}), 200
