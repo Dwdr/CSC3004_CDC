@@ -88,7 +88,7 @@ cp .env.template .env
 - `PORT`: Port number for the server
 - `SERVER_PORT`: Port number for the server
 
-6. Ensure that Docker is running and run the following command: ` docker compose up`
+6. Ensure that Docker is running and run the following command: `docker compose up`
 
 Client should now be accessible via `127.0.0.1:8000`. Server dashboard should now be accessible via `127.0.0.1:8001`
 
@@ -160,6 +160,12 @@ The crime detection system can be accessed through a web application. Client web
 - `127.0.0.1:8001/connected-devices` (GET): Returns a JSON
 - `127.0.0.1:8001/add-email` (POST): Add a client's email address to receive crime detection notifications. The request should contain the client's unique ID and the email address.
 - `127.0.0.1:8001/remove-email` (POST): Remove a client's email address from receiving crime detection notifications. The request should contain the client's unique ID and the email address.
+
+## Model Training
+
+- Running the train-model folder's make_data captures video frames, detects and tracks poses in each frame using Mediapipe, extracts pose landmarks, and saves them as a CSV file for further analysis.
+- The train_lstm.py (Long Short-Term Memory) loads pose data from the dataset, creates and trains an LSTM model and saves the trained model for future used to predict if a punch happened or it is neutral
+- This lstm-model that is saved is then used in our server's flask application, app.py to detect for violence
 
 ## Functionality
 
