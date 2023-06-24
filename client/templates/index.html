@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1>Live streaming</h1>
+
+    <div>
+      <h2>Notification System</h2>
+      <label for="emailInput" id="emailInputLabel">Email Address:</label>
+      <input type="email" id="emailInput" />
+      <button onclick="sendEmail()" id="emailButton">Send Email</button>
+      <p hidden="true" id="emailText"></p>
+      <button onclick="changeEmail()" id="changeEmailButton" hidden="true">
+        Change Email
+      </button>
+      <br />
+    </div>
+
+    <div>
+      <video id="videoElement" width="50%" autoplay></video>
+    </div>
+
+    <div id="violenceStatusSection">
+      <h2>Status Connection to backend server:</h2>
+      <div id="serverStatus"></div>
+
+      <h2>Violence Status:</h2>
+      <div id="violenceStatus"></div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+
+    <script>
+      var video = document.getElementById("videoElement");
+      var violenceStatus = document.getElementById("violenceStatus");
+      var serverStatus = document.getElementById("serverStatus");
+      var emailInputLabel = document.getElementById("emailInputLabel");
+      var emailInput = document.getElementById("emailInput");
+      var emailButton = document.getElementById("emailButton");
+      var emailText = document.getElementById("emailText");
+      var changeEmailButton = document.getElementById("changeEmailButton");
+      var port = {{ server_port }};
+
+      var socket = io("http://127.0.0.1:" + port);
+
+      violenceStatus.textContent = "Detecting...";
+      serverStatus.textContent = "Connecting to the server...";
+
+      var uid = sessionStorage.getItem("uid") || generateUID();
+      var email = sessionStorage.getItem("email");
+
+      if (email) {
+        emailInput.value = email;
+        emailInput.hidden = true;
+        emailInputLabel.hidden = true;
+        emailButton.hidden = true;
+        emailText.hidden = false;
+        emailText.textContent = "Notifications will be sent to: " + email;
+        changeEmailButton.hidden = false;
+      }
+
+      sessionStorage.setItem("uid", uid);
+
+      var constraints = { audio: true, video: true };
+
+      function generateUID() {
+        var chars =
+          "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        var uid = "";
+        for (var i = 0; i < 16; i++) {
+          uid += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return uid;
+      }
+
+      function requestCameraAccess() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices
+            .getUserMedia(constraints)
+            .then(function (mediaStream) {
+              video.srcObject = mediaStream;
+              video.onloadedmetadata = function (e) {
+                video.play();
+              };
+              enableRecording();
+            })
+            .catch(function (err) {
+              console.log(err.name + ": " + err.message);
+            });
+        } else {
+          console.log("getUserMedia is not supported in this browser.");
+          displayBrowserNotSupported();
+        }
+      }
+
+      function displayBrowserNotSupported() {
+        var violenceStatus = document.getElementById("violenceStatus");
+        violenceStatus.textContent =
+          "Camera access is not supported in this browser. Please switch to a supported browser to use this feature.";
+      }
+
+      socket.on("detection_result", function (data) {
+        if ("status" in data) {
+          var status = data.status;
+          if (status === "1") {
+            console.log("Server status: Connected");
+            serverStatus.textContent = "Connected";
+          } else if (status === "0") {
+            console.log("Server status: Error");
+            serverStatus.textContent = "Error";
+          } else {
+            console.log("Server status: Unknown");
+            serverStatus.textContent = "Unknown";
+          }
+        } else if ("has_crime" in data) {
+          var hasCrime = data.has_crime;
+          if (hasCrime === 1) {
+            console.log("Violence detected!");
+            violenceStatus.textContent = "Violence detected!";
+          } else if (hasCrime === 0) {
+            console.log("No violence detected.");
+            violenceStatus.textContent = "No violence detected.";
+          } else {
+            console.log("Error: Unable to determine violence status.");
+            violenceStatus.textContent =
+              "Error: Unable to determine violence status.";
+          }
+        }
+      });
+
+      function enableRecording() {
+        var frameCount = 0; // Track the number of frames captured
+        var interval = setInterval(function () {
+          console.log("Capturing frame");
+          var canvas = document.createElement("canvas");
+          var context = canvas.getContext("2d");
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          var base64Image = canvas.toDataURL();
+          sendImageToBackend(base64Image);
+          console.log("Sending image to backend server");
+
+          frameCount++;
+        }, 1000);
+      }
+
+
+      function changeEmail() {
+        fetch("http://127.0.0.1:" + port + "/remove-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            uid: uid,
+            email: email,
+          }),
+        })
+          .then((response) => {
+            if (response.ok) {
+              console.log("Email removed from backend server.");
+              sessionStorage.removeItem("email");
+              emailInput.hidden = false;
+              emailInputLabel.hidden = false;
+              emailButton.hidden = false;
+              emailText.hidden = true;
+              changeEmailButton.hidden = true;
+            } else {
+              console.error("Error removing email from backend server.");
+            }
+          })
+          .catch((error) => {
+            console.error("Error removing email from backend server:", error);
+          });
+      }
+
+      function sendEmail() {
+        var email = emailInput.value;
+        if (validateEmail(email)) {
+          sendEmailToBackend(email);
+        } else {
+          alert("Please enter a valid email address.");
+        }
+      }
+
+      function validateEmail(email) {
+        var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailPattern.test(email);
+      }
+
+      function sendEmailToBackend(email) {
+        var email = emailInput.value;
+        fetch("http://127.0.0.1:" + port + "/add-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: email, uid: uid }),
+        })
+          .then((response) => {
+            if (response.ok) {
+              console.log("Email sent to backend server.");
+              sessionStorage.setItem("email", email);
+              emailInput.hidden = true;
+              emailInputLabel.hidden = true;
+              emailButton.hidden = true;
+              emailText.hidden = false;
+              emailText.textContent = "Notifications will be sent to: " + email;
+              changeEmailButton.hidden = false;
+            } else {
+              alert("Error sending email to backend server.");
+              console.error("Error sending email to backend server.");
+            }
+          })
+          .catch((error) => {
+            console.error("Error sending email to backend server:", error);
+          });
+      }
+
+      function sendImageToBackend(imageData) {
+        fetch("http://127.0.0.1:" + port + "/collect-frames", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ image: imageData, uid: uid }),
+        })
+          .then((response) => {
+            if (response.ok) {
+              console.log("Image sent to backend server.");
+            } else {
+              console.error("Error sending image to backend server.");
+            }
+          })
+          .catch((error) => {
+            console.error("Error sending image to backend server:", error);
+          });
+      }
+
+      // Add the following event listener at the end of the JavaScript code
+      window.addEventListener("beforeunload", function () {
+        disconnect();
+      });
+
+      // Modify the disconnect() function as follows
+      function disconnect() {
+        socket.disconnect();
+        serverStatus.textContent = "Disconnected";
+        violenceStatus.textContent =
+          "Connection to backend server disconnected.";
+        changeEmailButton.hidden = true;
+        disconnectButton.hidden = true;
+      }
+
+      requestCameraAccess();
+    </script>
+  </body>
+</html>

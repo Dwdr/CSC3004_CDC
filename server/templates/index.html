@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Server Dashboard</title>
+    <style>
+      table {
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border: 1px solid black;
+        padding: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Server Dashboard</h1>
+
+    <h2>File Names</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>File Name</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="file-names-body"></tbody>
+    </table>
+
+    <h2>Client Connected</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Client ID</th>
+          <th>Client Email</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="dashboard-body"></tbody>
+    </table>
+
+    <script>
+      // Get the table body element for file names
+      const fileNamesTableBody = document.getElementById("file-names-body");
+
+      // Make a GET request to the Flask route "/file-names" to retrieve the file names
+      fetch("http://127.0.0.1:" + location.port + "/file-names")
+        .then((response) => response.json())
+        .then((data) => {
+          const fileNames = data.fileNames;
+
+          // Loop through the file names and create table rows with two columns
+          fileNames.forEach((fileName) => {
+            const row = document.createElement("tr");
+
+            const fileNameCell = document.createElement("td");
+            fileNameCell.textContent = fileName;
+            row.appendChild(fileNameCell);
+
+            const statusCell = document.createElement("td");
+            statusCell.textContent = "Unprocessed";
+            row.appendChild(statusCell);
+
+            fileNamesTableBody.appendChild(row);
+          });
+        })
+        .catch((error) => console.error(error));
+
+      // Get the table body element for client connected
+      const dashboardTableBody = document.getElementById("dashboard-body");
+
+      // Function to update the client status in the table
+      function updateClientStatus(clientID, hasCrime) {
+        const row = dashboardTableBody.querySelector(
+          `tr[data-client="${clientID}"]`
+        );
+        if (row) {
+          const statusCell = row.querySelector(".status-cell");
+          if (hasCrime === 1) {
+            statusCell.textContent = "Crime Detected";
+          } else {
+            statusCell.textContent = "No Crime Detected";
+          }
+        }
+      }
+
+      function updateDashboard() {
+        fetch("http://127.0.0.1:" + location.port + "/connected-devices")
+          .then((response) => response.json())
+          .then((data) => {
+            const connectedDevices = data;
+
+            // Loop through the connected devices and update/create table rows with two columns
+            connectedDevices.forEach((device) => {
+              const clientID = device.client_id;
+              const clientEmail = device.client_email;
+              const hasCrime = device.has_crime;
+              console.log(clientID, clientEmail, hasCrime);
+
+              // Check if a row with the same client ID already exists
+              const existingRow = dashboardTableBody.querySelector(
+                `tr[data-client="${clientID}"]`
+              );
+
+              if (existingRow) {
+                // Update the status cell of the existing row
+                const statusCell = existingRow.querySelector(".status-cell");
+                if (hasCrime === 1) {
+                  statusCell.textContent = "Crime Detected";
+                } else {
+                  statusCell.textContent = "No Crime Detected";
+                }
+              } else {
+                // Create a new row
+                const row = document.createElement("tr");
+                row.setAttribute("data-client", clientID);
+
+                const clientIDCell = document.createElement("td");
+                clientIDCell.className = "client-id-cell";
+                clientIDCell.textContent = clientID;
+                row.appendChild(clientIDCell);
+
+                const clientEmailCell = document.createElement("td");
+                clientEmailCell.className = "client-email-cell";
+                if (clientEmail === undefined) {
+                  clientEmailCell.textContent = "Unknown";
+                } else {
+                  clientEmailCell.textContent = clientEmail;
+                }
+                row.appendChild(clientEmailCell);
+
+                const statusCell = document.createElement("td");
+                statusCell.className = "status-cell";
+                if (hasCrime === 1) {
+                  statusCell.textContent = "Crime Detected";
+                } else {
+                  statusCell.textContent = "No Crime Detected";
+                }
+                row.appendChild(statusCell);
+
+                dashboardTableBody.appendChild(row);
+              }
+            });
+          })
+          .catch((error) => console.error(error));
+      }
+
+      // Update the dashboard initially
+      updateDashboard();
+
+      // Update the dashboard every 3 seconds
+      setInterval(updateDashboard, 3000);
+    </script>
+  </body>
+</html>
