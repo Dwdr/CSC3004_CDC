@@ -23,6 +23,7 @@ def index():
     return render_template('index.html')
 
 def make_landmark_timestep(results):
+    # Function to convert pose landmarks to a flattened list
     c_lm = []
     for id, lm in enumerate(results.pose_landmarks.landmark):
         c_lm.append(lm.x)
@@ -32,6 +33,7 @@ def make_landmark_timestep(results):
     return c_lm
 
 def draw_landmark_on_image(mpDraw, results, frame):
+    # Function to draw landmarks on the frame
     mpDraw.draw_landmarks(frame, results.pose_landmarks, mpPose.POSE_CONNECTIONS)
     for id, lm in enumerate(results.pose_landmarks.landmark):
         h, w, c = frame.shape
@@ -40,6 +42,7 @@ def draw_landmark_on_image(mpDraw, results, frame):
     return frame
 
 def draw_class_on_image(label, img):
+    # Function to draw the predicted class label on the image
     font = cv2.FONT_HERSHEY_SIMPLEX
     bottomLeftCornerOfText = (10, 30)
     fontScale = 1
@@ -53,6 +56,7 @@ def draw_class_on_image(label, img):
     return img
 
 def detect(model, lm_list):
+    # Function to perform violence detection using the LSTM model
     global label
     lm_list = np.array(lm_list)
     lm_list = np.expand_dims(lm_list, axis=0)
@@ -64,6 +68,7 @@ def detect(model, lm_list):
     return str(label)
 
 def generate_frames():
+    # Generator function to process video frames and yield as MJPEG frames
     global lm_list, label
     i = 0
     warm_up_frames = 60
@@ -110,6 +115,7 @@ def generate_frames():
 
 @app.route('/video_feed')
 def video_feed():
+    # Route to provide the video feed as a response with MJPEG content type
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
